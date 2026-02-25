@@ -119,6 +119,21 @@ def _map_osv_severity(score: float) -> str:
     return FindingSeverity.INFO
 
 
+def _map_osv_severity_label(label: str) -> str | None:
+    normalized = label.strip().lower()
+    if not normalized:
+        return None
+    mapping = {
+        'critical': FindingSeverity.CRITICAL,
+        'high': FindingSeverity.HIGH,
+        'medium': FindingSeverity.MEDIUM,
+        'moderate': FindingSeverity.MEDIUM,
+        'low': FindingSeverity.LOW,
+        'info': FindingSeverity.INFO,
+    }
+    return mapping.get(normalized)
+
+
 def _normalize_osv(payload: dict | list) -> list[dict]:
     if not isinstance(payload, dict):
         return []
@@ -126,17 +141,22 @@ def _normalize_osv(payload: dict | list) -> list[dict]:
     findings = []
     for result in payload.get('results', []):
         packages = result.get('packages') or []
-        vulns = result.get('vulns') or []
+        result_level_vulns = result.get('vulns') or result.get('vulnerabilities') or []
+        source_path = str((result.get('source') or {}).get('path') or '')
         for package_entry in packages:
             package = package_entry.get('package') or {}
             package_name = package.get('name') or package_entry.get('package_name') or 'unknown-package'
-            package_version = package_entry.get('version') or 'unknown-version'
-            file_path = package_entry.get('path') or ''
+            package_version = package.get('version') or package_entry.get('version') or 'unknown-version'
+            file_path = str(package_entry.get('path') or source_path)
+            package_vulns = package_entry.get('vulnerabilities') or result_level_vulns
 
-            for vuln in vulns:
+            for vuln in package_vulns:
                 vuln_id = vuln.get('id') or 'unknown-vuln'
-                score = _extract_osv_score(vuln)
-                severity = _map_osv_severity(score)
+                db_specific = vuln.get('database_specific') or {}
+                severity = _map_osv_severity_label(str(db_specific.get('severity', '')))
+                if severity is None:
+                    score = _extract_osv_score(vuln)
+                    severity = _map_osv_severity(score)
 
                 findings.append(
                     {

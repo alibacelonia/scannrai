@@ -27,7 +27,6 @@ export default function ProjectPage() {
 
   const [project, setProject] = useState<Project | null>(null);
   const [scans, setScans] = useState<Scan[]>([]);
-  const [zipFile, setZipFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +58,10 @@ export default function ProjectPage() {
     setRunning(true);
     setError(null);
     try {
-      const scan = await createScan(projectId, { zipFile });
-      setZipFile(null);
+      if (!project?.repo_url) {
+        throw new ApiError("Set a repository source path or URL first.", 400);
+      }
+      const scan = await createScan(projectId);
       await loadData();
       router.push(`/scans/${scan.id}`);
     } catch (err) {
@@ -89,19 +90,14 @@ export default function ProjectPage() {
           <CardTitle>{project.name}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-[var(--ink-muted)]">Repo URL: {project.repo_url || "No repo URL configured"}</p>
+          <p className="text-sm text-[var(--ink-muted)]">Repository source: {project.repo_url || "No source configured"}</p>
           <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={runScan}>
-            <input
-              className="block w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm"
-              onChange={(event) => setZipFile(event.target.files?.[0] ?? null)}
-              type="file"
-              accept=".zip,application/zip"
-            />
+            <p className="self-center text-xs text-[var(--ink-muted)]">Scan runs in background via worker queue (Celery + Redis).</p>
             <Button disabled={running} type="submit">
-              {running ? "Running..." : "Run scan"}
+              {running ? "Queueing..." : "Run scan"}
             </Button>
           </form>
-          <p className="text-xs text-[var(--ink-muted)]">Attach ZIP to scan local code, or leave empty to use project repo URL.</p>
+          <p className="text-xs text-[var(--ink-muted)]">Use a local git repository path, local zip path, or remote git URL as the project source.</p>
           {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
         </CardContent>
       </Card>

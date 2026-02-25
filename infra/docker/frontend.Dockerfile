@@ -8,4 +8,4 @@ RUN npm ci
 COPY frontend/ ./
 
 EXPOSE 3000
-CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["./scripts/dev-start.sh"]

@@ -4,12 +4,13 @@ ScannrAI is an AI-assisted code security scanner built with Django, DRF, Celery,
 
 ## Features
 - Project management with authenticated users
-- Scan ingestion from Git URL or ZIP upload
+- Path-based repository sources (remote Git URL, local git directory path, or local `.zip` path)
 - Tool execution pipeline for Semgrep, OSV Scanner, and Gitleaks
 - Normalized and deduped findings across tools
 - Findings filters, detail drawer, code snippet view, and raw payload view
 - AI endpoints for scan summary, finding explanation, and patch scaffolding
 - Export endpoints (JSON and Markdown)
+- Background scan execution via Celery + Redis queue (MQ)
 - Scan hardening: rate limits, timeout controls, retention policy, and audit logs
 
 ## Architecture
@@ -56,6 +57,7 @@ flowchart LR
    - `CORS_ALLOWED_ORIGINS` (must include frontend URL, default `http://localhost:3000`)
    - `NEXT_PUBLIC_API_BASE_URL`
    - `SCAN_*` settings (timeouts, retention, rate limits)
+   - `LOCAL_REPO_MOUNT_PATH` (container path where host home is mounted; default `/host/home`)
 
 ### 2) Start the Full App (Docker)
 1. Build and run all services:
@@ -78,9 +80,25 @@ flowchart LR
 ### 4) First Use
 1. Open `/register` in the frontend and create an account.
 2. Sign in at `/login`.
-3. Create a project in the dashboard.
-4. Run a scan (use repo URL or upload a ZIP).
-5. Review findings and export JSON/Markdown from the scan page.
+3. Open a repository from the dashboard:
+   - Remote: paste a Git repository URL (for example `https://github.com/org/repo`).
+   - Local:
+     - click `Select repo folder` to choose a folder
+     - app resolves local path and validates source with backend before open
+     - app fills source path automatically when browser exposes absolute paths
+     - otherwise, paste or confirm/edit path manually
+     - local git directory (for example `/host/home/dev/my-repo`)
+     - local zip file path (for example `/host/home/dev/my-repo.zip`)
+4. Run a scan from the repository page. Scan is queued immediately and runs in the background worker.
+5. Review findings and export JSON/Markdown from the scan detail page.
+
+### Local Source Path Tips
+- Local sources are path-based only (no browser upload).
+- Folder/local path is server-validated before scan queueing.
+- In Docker compose, host home is mounted read-only to `${LOCAL_REPO_MOUNT_PATH}` (`/host/home` by default).
+- If your host repo path is `/Users/<you>/dev/repo`, enter `/host/home/dev/repo` in the app.
+- For local zip snapshots, enter the zip path directly, for example `/host/home/dev/repo.zip`.
+- If you see `Repository source path is not accessible from scanner runtime`, your path is incomplete or wrong; include full nested directories (example: `/host/home/personal-projects/<repo-folder>`).
 
 ## Development Commands
 - Start in background:
@@ -91,6 +109,8 @@ flowchart LR
   - `docker compose logs -f backend worker frontend`
 - Rebuild one service:
   - `docker compose build backend`
+- Clean Docker cache/artifacts (safe mode):
+  - `make docker-clean`
 - Run backend tests:
   - `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test`
 - Frontend lint/build:

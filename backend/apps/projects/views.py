@@ -1,4 +1,3 @@
-from pathlib import Path
 from datetime import timedelta
 
 from django.conf import settings
@@ -7,12 +6,11 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.findings.normalizers import normalize_and_store_findings
 from apps.scans.audit import record_audit_event
 from apps.scans.models import AuditEventType, Scan, ScanStatus
 from apps.scans.serializers import ScanCreateSerializer, ScanSerializer
-from apps.scans.services import cleanup_scan_workspace, ingest_scan_source
-from apps.scans.tool_runners import run_all_tools
+from apps.scans.services import discover_local_source_candidates, validate_repository_source_reference
+from apps.scans.tasks import scan_repo
 
 from .models import Project
 from .serializers import ProjectSerializer
@@ -27,6 +25,25 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+    @action(detail=False, methods=['post'], url_path='validate-source')
+    def validate_source(self, request):
+        source = str(request.data.get('source') or '').strip()
+        if not source:
+            return Response({'detail': 'source is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            validation = validate_repository_source_reference(source)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'valid': True, **validation}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='discover-source')
+    def discover_source(self, request):
+        folder_name = str(request.data.get('folder_name') or '').strip()
+        if not folder_name:
+            return Response({'detail': 'folder_name is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        candidates = discover_local_source_candidates(folder_name)
+        return Response({'folder_name': folder_name, 'candidates': candidates}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get', 'post'], url_path='scans')
     def scans(self, request, pk=None):
@@ -50,61 +67,63 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
+        if request.FILES.get('zip_file') or request.FILES.getlist('repo_files') or request.data.get('repo_paths'):
+            return Response(
+                {
+                    'detail': (
+                        'Upload-based local sources are disabled. '
+                        'Set the project repository source to a local path or remote git URL.'
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not (project.repo_url or '').strip():
+            return Response(
+                {'detail': 'Repository source is required. Set a local path, local zip path, or remote git URL first.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            source_validation = validate_repository_source_reference(project.repo_url)
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = ScanCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         scan = Scan.objects.create(
             project=project,
-            status=ScanStatus.RUNNING,
-            started_at=timezone.now(),
+            status=ScanStatus.QUEUED,
             **serializer.validated_data,
         )
-        record_audit_event(
-            scan=scan,
-            event_type=AuditEventType.SCAN_STARTED,
-            user=request.user,
-            message='Scan started.',
-        )
-
-        zip_file = request.FILES.get('zip_file')
 
         try:
-            commit_hash, ingestion_meta = ingest_scan_source(scan, zip_file=zip_file)
             meta = dict(scan.meta or {})
-            meta.update(ingestion_meta)
+            meta['queued_via'] = 'celery'
+            meta['queued_by'] = request.user.id
+            meta['queued_at'] = timezone.now().isoformat()
+            meta['source_kind'] = source_validation['kind']
             scan.meta = meta
-            if commit_hash:
-                scan.commit_hash = commit_hash
-
-            repo_dir = Path(ingestion_meta['repo_dir'])
-            tool_runs, tool_output_paths = run_all_tools(scan.id, repo_dir)
-            scan.meta['tool_runs'] = tool_runs
-            scan.meta['tool_output_paths'] = tool_output_paths
-            normalization = normalize_and_store_findings(scan, tool_output_paths)
-            scan.meta['normalization'] = normalization
-            scan.meta['summary_counts'] = normalization['summary_counts']
-            scan.status = ScanStatus.COMPLETED
+            async_result = scan_repo.delay(scan.id)
+            scan.meta['task_id'] = async_result.id
             record_audit_event(
                 scan=scan,
-                event_type=AuditEventType.SCAN_COMPLETED,
+                event_type=AuditEventType.SCAN_STARTED,
                 user=request.user,
-                message='Scan completed.',
-                meta={'finding_count': normalization['persisted_total']},
+                message='Scan queued.',
+                meta={'task_id': async_result.id},
             )
         except Exception as exc:
             meta = dict(scan.meta or {})
-            meta['ingestion_error'] = str(exc)
+            meta['queue_error'] = str(exc)
             scan.meta = meta
             scan.status = ScanStatus.FAILED
             record_audit_event(
                 scan=scan,
                 event_type=AuditEventType.SCAN_FAILED,
                 user=request.user,
-                message='Scan failed.',
+                message='Scan queue failed.',
                 meta={'error': str(exc)},
             )
-        finally:
-            scan.finished_at = timezone.now()
-            scan.save(update_fields=['status', 'commit_hash', 'meta', 'finished_at', 'updated_at'])
-            cleanup_scan_workspace(scan.id)
+        scan.save(update_fields=['status', 'meta', 'updated_at'])
 
         return Response(ScanSerializer(scan).data, status=status.HTTP_201_CREATED)

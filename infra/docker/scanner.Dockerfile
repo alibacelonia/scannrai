@@ -13,7 +13,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt semgrep==1.86.0
+RUN pip install --no-cache-dir "setuptools<81" \
+    && pip install --no-cache-dir -r /tmp/requirements.txt semgrep==1.86.0
 
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \

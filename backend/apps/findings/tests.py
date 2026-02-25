@@ -126,6 +126,59 @@ class FindingNormalizationTests(TestCase):
         self.assertEqual(gitleaks_finding.raw['Secret'], '***REDACTED***')
         self.assertEqual(gitleaks_finding.raw['Match'], '***REDACTED***')
 
+    def test_normalize_osv_package_vulnerabilities_shape(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            osv_path = temp_path / 'osv-scanner.json'
+
+            osv_path.write_text(
+                json.dumps(
+                    {
+                        'results': [
+                            {
+                                'source': {
+                                    'path': '/tmp/scannrai/demo/requirements.txt',
+                                    'type': 'lockfile',
+                                },
+                                'packages': [
+                                    {
+                                        'package': {
+                                            'name': 'django',
+                                            'version': '2.2.0',
+                                            'ecosystem': 'PyPI',
+                                        },
+                                        'vulnerabilities': [
+                                            {
+                                                'id': 'GHSA-2gwj-7jmv-h26r',
+                                                'severity': [{'type': 'CVSS_V3', 'score': '8.1'}],
+                                                'database_specific': {'severity': 'CRITICAL'},
+                                            }
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ),
+                encoding='utf-8',
+            )
+
+            result = normalize_and_store_findings(
+                self.scan,
+                {
+                    'semgrep': str(temp_path / 'semgrep.json'),
+                    'osv': str(osv_path),
+                    'gitleaks': str(temp_path / 'gitleaks.json'),
+                },
+            )
+
+        self.assertEqual(result['persisted_total'], 1)
+        finding = Finding.objects.get(scan=self.scan)
+        self.assertEqual(finding.tool, FindingTool.OSV)
+        self.assertEqual(finding.severity, FindingSeverity.CRITICAL)
+        self.assertEqual(finding.category, 'Dependency Vulnerability')
+        self.assertTrue(finding.file_path.endswith('requirements.txt'))
+
 
 class FindingAiEndpointsTests(APITestCase):
     def setUp(self):

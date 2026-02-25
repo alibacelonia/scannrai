@@ -6,13 +6,16 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, exportScanJson, exportScanMarkdown, getFinding, getScan, listScanFindings } from "@/lib/api";
 import type { Finding, Scan, Severity, Tool } from "@/types/api";
 
-const severityOptions: Array<"" | Severity> = ["", "critical", "high", "medium", "low", "info"];
-const toolOptions: Array<"" | Tool> = ["", "semgrep", "osv", "gitleaks"];
+const severityOptions: Array<"all" | Severity> = ["all", "critical", "high", "medium", "low", "info"];
+const toolOptions: Array<"all" | Tool> = ["all", "semgrep", "osv", "gitleaks"];
 
 export default function ScanPage() {
   const params = useParams<{ id: string }>();
@@ -215,28 +218,30 @@ export default function ScanPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-4">
-            <select
-              className="h-10 rounded-lg border border-[var(--border)] px-3 text-sm"
-              onChange={(event) => setSeverity(event.target.value as "" | Severity)}
-              value={severity}
-            >
-              {severityOptions.map((value) => (
-                <option key={value || "all"} value={value}>
-                  {value || "All severities"}
-                </option>
-              ))}
-            </select>
-            <select
-              className="h-10 rounded-lg border border-[var(--border)] px-3 text-sm"
-              onChange={(event) => setTool(event.target.value as "" | Tool)}
-              value={tool}
-            >
-              {toolOptions.map((value) => (
-                <option key={value || "all"} value={value}>
-                  {value || "All tools"}
-                </option>
-              ))}
-            </select>
+            <Select onValueChange={(value) => setSeverity(value === "all" ? "" : (value as Severity))} value={severity || "all"}>
+              <SelectTrigger>
+                <SelectValue placeholder="All severities" />
+              </SelectTrigger>
+              <SelectContent>
+                {severityOptions.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {value === "all" ? "All severities" : value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select onValueChange={(value) => setTool(value === "all" ? "" : (value as Tool))} value={tool || "all"}>
+              <SelectTrigger>
+                <SelectValue placeholder="All tools" />
+              </SelectTrigger>
+              <SelectContent>
+                {toolOptions.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {value === "all" ? "All tools" : value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input onChange={(event) => setCategory(event.target.value)} placeholder="Category" value={category} />
             <Input onChange={(event) => setFileQuery(event.target.value)} placeholder="File path" value={fileQuery} />
           </div>
@@ -288,61 +293,52 @@ export default function ScanPage() {
         </CardContent>
       </Card>
 
-      {selectedFinding ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 p-2 md:p-6">
-          <div className="flex h-full w-full max-w-2xl flex-col rounded-2xl border border-[var(--border)] bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-              <p className="font-semibold">Finding #{selectedFinding.id}</p>
-              <button
-                className="rounded-lg border border-[var(--border)] px-3 py-1 text-sm hover:bg-[var(--muted)]"
-                onClick={() => setSelectedFinding(null)}
-                type="button"
+      <Dialog open={Boolean(selectedFinding)} onOpenChange={(open) => !open && setSelectedFinding(null)}>
+        {selectedFinding ? (
+          <DialogContent className="flex h-[90vh] max-w-2xl flex-col overflow-hidden p-0">
+            <DialogHeader className="border-b border-[var(--border)] px-5 py-4">
+              <DialogTitle>Finding #{selectedFinding.id}</DialogTitle>
+              <DialogDescription>
+                Review the highlighted snippet or raw scanner payload.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden p-4">
+              <Tabs
+                className="flex h-full flex-col"
+                value={detailTab}
+                onValueChange={(value) => setDetailTab(value as "snippet" | "raw")}
               >
-                Close
-              </button>
+                <TabsList>
+                  <TabsTrigger value="snippet">Code Snippet</TabsTrigger>
+                  <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                </TabsList>
+                <TabsContent className="h-full overflow-auto" value="snippet">
+                  {selectedFinding.snippet?.lines?.length ? (
+                    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#0f172a] text-xs text-slate-100">
+                      {selectedFinding.snippet.lines.map((line) => (
+                        <div
+                          className={`grid grid-cols-[56px_1fr] px-3 py-1 ${line.highlighted ? "bg-[#1e293b]" : ""}`}
+                          key={line.line_number}
+                        >
+                          <span className="text-slate-400">{line.line_number}</span>
+                          <code className="whitespace-pre-wrap">{line.content || " "}</code>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--ink-muted)]">No snippet available for this finding.</p>
+                  )}
+                </TabsContent>
+                <TabsContent className="h-full overflow-auto" value="raw">
+                  <pre className="overflow-auto rounded-xl bg-[var(--ink)] p-4 text-xs text-white">
+                    {JSON.stringify(selectedFinding.raw, null, 2)}
+                  </pre>
+                </TabsContent>
+              </Tabs>
             </div>
-            <div className="flex gap-2 border-b border-[var(--border)] px-5 py-3 text-sm">
-              <button
-                className={`rounded-lg px-3 py-1 ${detailTab === "snippet" ? "bg-[var(--brand-100)] text-[var(--brand-700)]" : "bg-[var(--muted)]"}`}
-                onClick={() => setDetailTab("snippet")}
-                type="button"
-              >
-                Code Snippet
-              </button>
-              <button
-                className={`rounded-lg px-3 py-1 ${detailTab === "raw" ? "bg-[var(--brand-100)] text-[var(--brand-700)]" : "bg-[var(--muted)]"}`}
-                onClick={() => setDetailTab("raw")}
-                type="button"
-              >
-                Raw JSON
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-4">
-              {detailTab === "snippet" ? (
-                selectedFinding.snippet?.lines?.length ? (
-                  <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#0f172a] text-xs text-slate-100">
-                    {selectedFinding.snippet.lines.map((line) => (
-                      <div
-                        className={`grid grid-cols-[56px_1fr] px-3 py-1 ${line.highlighted ? "bg-[#1e293b]" : ""}`}
-                        key={line.line_number}
-                      >
-                        <span className="text-slate-400">{line.line_number}</span>
-                        <code className="whitespace-pre-wrap">{line.content || " "}</code>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--ink-muted)]">No snippet available for this finding.</p>
-                )
-              ) : (
-                <pre className="overflow-auto rounded-xl bg-[var(--ink)] p-4 text-xs text-white">
-                  {JSON.stringify(selectedFinding.raw, null, 2)}
-                </pre>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
+          </DialogContent>
+        ) : null}
+      </Dialog>
 
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
     </div>

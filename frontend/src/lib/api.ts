@@ -115,11 +115,39 @@ export async function listProjects(): Promise<Paginated<Project>> {
   return apiRequest<Paginated<Project>>("/api/projects/");
 }
 
-export async function createProject(name: string, repoUrl: string): Promise<Project> {
+export async function createProject(name: string, source: string): Promise<Project> {
   return apiRequest<Project>("/api/projects/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, repo_url: repoUrl || null }),
+    body: JSON.stringify({ name, repo_url: source || null }),
+  });
+}
+
+export async function validateRepositorySource(source: string): Promise<{
+  valid: boolean;
+  kind: string;
+  resolved_path?: string;
+  reference?: string;
+}> {
+  return apiRequest<{
+    valid: boolean;
+    kind: string;
+    resolved_path?: string;
+    reference?: string;
+  }>("/api/projects/validate-source/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source }),
+  });
+}
+
+export async function discoverRepositorySource(
+  folderName: string,
+): Promise<{ folder_name: string; candidates: string[] }> {
+  return apiRequest<{ folder_name: string; candidates: string[] }>("/api/projects/discover-source/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ folder_name: folderName }),
   });
 }
 
@@ -131,21 +159,11 @@ export async function listProjectScans(projectId: string): Promise<Paginated<Sca
   return apiRequest<Paginated<Scan>>(`/api/projects/${projectId}/scans/`);
 }
 
-export async function createScan(projectId: string, payload: { zipFile?: File | null } = {}): Promise<Scan> {
-  if (payload.zipFile) {
-    const form = new FormData();
-    form.append("zip_file", payload.zipFile);
-    form.append("meta", JSON.stringify({ trigger: "ui-upload" }));
-    return apiRequest<Scan>(`/api/projects/${projectId}/scans/`, {
-      method: "POST",
-      body: form,
-    });
-  }
-
+export async function createScan(projectId: string): Promise<Scan> {
   return apiRequest<Scan>(`/api/projects/${projectId}/scans/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ meta: { trigger: "ui" } }),
+    body: JSON.stringify({ meta: { trigger: "ui-queue" } }),
   });
 }
 
