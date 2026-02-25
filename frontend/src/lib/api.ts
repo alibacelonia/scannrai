@@ -15,6 +15,24 @@ class ApiError extends Error {
   }
 }
 
+function firstErrorMessage(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return firstErrorMessage(value[0]);
+  }
+  if (typeof value === "object" && value !== null) {
+    for (const [key, nested] of Object.entries(value)) {
+      const childMessage = firstErrorMessage(nested);
+      if (childMessage) {
+        return `${key}: ${childMessage}`;
+      }
+    }
+  }
+  return null;
+}
+
 async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
@@ -27,10 +45,19 @@ async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (error) {
+    throw new ApiError(
+      "Cannot reach API. Check that backend is running and CORS is configured for http://localhost:3000.",
+      0,
+      error,
+    );
+  }
 
   let body: unknown = null;
   const contentType = response.headers.get("content-type") ?? "";
@@ -44,10 +71,12 @@ async function apiRequest<T>(
     if (response.status === 401) {
       clearTokens();
     }
-    const message =
+    const messageFromDetail =
       typeof body === "object" && body !== null && "detail" in body
         ? String((body as { detail?: string }).detail)
-        : response.statusText || "Request failed";
+        : null;
+    const message =
+      messageFromDetail || firstErrorMessage(body) || response.statusText || "Request failed";
     throw new ApiError(message, response.status, body);
   }
 

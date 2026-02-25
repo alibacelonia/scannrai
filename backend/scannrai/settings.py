@@ -14,6 +14,11 @@ def env(key: str, default: str | None = None) -> str | None:
     return os.getenv(key, default)
 
 
+def env_list(key: str, default: str = '') -> list[str]:
+    raw = os.getenv(key, default)
+    return [item.strip() for item in raw.split(',') if item.strip()]
+
+
 SECRET_KEY = env('DJANGO_SECRET_KEY', 'dev-only-secret-key')
 DEBUG = env('DJANGO_DEBUG', '1') == '1'
 ALLOWED_HOSTS = [h.strip() for h in env('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,backend').split(',') if h.strip()]
@@ -25,6 +30,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
     'apps.accounts',
@@ -35,6 +41,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -120,3 +127,9 @@ SCAN_WORKDIR = env('SCAN_WORKDIR', '/tmp/scannrai')
 SCAN_RETENTION_SECONDS = int(env('SCAN_RETENTION_SECONDS', '86400'))
 SCAN_TOOL_TIMEOUT_SECONDS = int(env('SCAN_TOOL_TIMEOUT_SECONDS', '600'))
 SCAN_RATE_LIMIT_PER_HOUR = int(env('SCAN_RATE_LIMIT_PER_HOUR', '20'))
+
+CORS_ALLOWED_ORIGINS = env_list(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000',
+)
+CORS_ALLOW_CREDENTIALS = env('CORS_ALLOW_CREDENTIALS', '1') == '1'

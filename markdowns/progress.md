@@ -396,3 +396,13 @@
   - `docker compose ps` (all services running)
   - `curl http://localhost:8000/api/health/` => `{"status": "ok"}`
 
+## 2026-02-26 — Incident fix: unable to create account (CORS)
+- Investigated frontend registration failure (`Unable to create account right now.`).
+- Root cause: missing backend CORS middleware/config; browser blocked cross-origin register/login requests.
+- Added `django-cors-headers` and configured CORS origins via env.
+- Improved frontend API client to surface network/CORS and field-level validation errors.
+- Added regression test for register preflight CORS headers.
+- Rebuilt backend/worker/scanner services and verified:
+  - preflight includes `access-control-allow-origin`
+  - cross-origin register call returns 201
+

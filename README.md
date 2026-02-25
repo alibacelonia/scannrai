@@ -53,6 +53,7 @@ flowchart LR
    - `POSTGRES_*`
    - `POSTGRES_HOST_PORT` (host binding; default `5433`)
    - `REDIS_HOST_PORT` (host binding; default `6380`)
+   - `CORS_ALLOWED_ORIGINS` (must include frontend URL, default `http://localhost:3000`)
    - `NEXT_PUBLIC_API_BASE_URL`
    - `SCAN_*` settings (timeouts, retention, rate limits)
 
