@@ -222,3 +222,44 @@
 ### Next task
 - Section 8: implement AI layer endpoints (redaction + summary/explain/patch scaffolding).
 
+## 2026-02-26 — Section 8 AI layer scaffolding completed
+- Added AI persistence fields:
+  - `Scan.ai_summary`
+  - `Finding.ai_explanation`
+  - `Finding.ai_fix_suggestion`
+  - `Finding.ai_patch_diff`
+  - `Finding.confidence`
+- Implemented AI service helpers in `apps/scans/ai.py`:
+  - redaction pipeline for secret-like values
+  - scan summary generation
+  - finding explanation and fix suggestion generation
+  - patch diff scaffolding
+  - explicit review warning message
+- Added API endpoints:
+  - `POST /api/scans/:id/ai/summary`
+  - `POST /api/findings/:id/ai/explain`
+  - `POST /api/findings/:id/ai/patch`
+- Included AI fields in serializers so data is retrievable in existing scan/finding responses.
+- Added automated tests for new AI endpoints and persistence behavior.
+
+### Files changed
+- `backend/apps/scans/ai.py`
+- `backend/apps/scans/models.py`
+- `backend/apps/scans/views.py`
+- `backend/apps/scans/serializers.py`
+- `backend/apps/scans/migrations/0002_scan_ai_summary.py`
+- `backend/apps/findings/models.py`
+- `backend/apps/findings/views.py`
+- `backend/apps/findings/serializers.py`
+- `backend/apps/findings/migrations/0003_finding_ai_explanation_finding_ai_fix_suggestion_and_more.py`
+- `backend/apps/findings/tests.py`
+- `backend/apps/scans/tests.py`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `/Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py makemigrations scans findings`
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+
+### Next task
+- Section 9: implement export endpoints (JSON + Markdown) and wire frontend download actions.
+

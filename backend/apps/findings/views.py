@@ -1,5 +1,8 @@
 from rest_framework import mixins, permissions, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
+from apps.scans.ai import REVIEW_WARNING, build_finding_explanation, build_patch_suggestion
 from .models import Finding
 from .serializers import FindingDetailSerializer, FindingSerializer
 
@@ -15,3 +18,29 @@ class FindingViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         if self.action == 'retrieve':
             return FindingDetailSerializer
         return FindingSerializer
+
+    @action(detail=True, methods=['post'], url_path='ai/explain')
+    def ai_explain(self, request, pk=None):
+        finding = self.get_object()
+        explanation, fix_suggestion, confidence = build_finding_explanation(finding)
+        finding.ai_explanation = explanation
+        finding.ai_fix_suggestion = fix_suggestion
+        finding.confidence = confidence
+        finding.save(update_fields=['ai_explanation', 'ai_fix_suggestion', 'confidence'])
+        return Response(
+            {
+                'finding_id': finding.id,
+                'ai_explanation': explanation,
+                'ai_fix_suggestion': fix_suggestion,
+                'confidence': confidence,
+                'warning': REVIEW_WARNING,
+            }
+        )
+
+    @action(detail=True, methods=['post'], url_path='ai/patch')
+    def ai_patch(self, request, pk=None):
+        finding = self.get_object()
+        patch_diff = build_patch_suggestion(finding)
+        finding.ai_patch_diff = patch_diff
+        finding.save(update_fields=['ai_patch_diff'])
+        return Response({'finding_id': finding.id, 'ai_patch_diff': patch_diff, 'warning': REVIEW_WARNING})

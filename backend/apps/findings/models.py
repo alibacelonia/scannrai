@@ -27,6 +27,10 @@ class Finding(models.Model):
     line_end = models.PositiveIntegerField(blank=True, null=True)
     raw = models.JSONField(default=dict, blank=True)
     fingerprint = models.CharField(max_length=128, db_index=True)
+    ai_explanation = models.TextField(blank=True, null=True)
+    ai_fix_suggestion = models.TextField(blank=True, null=True)
+    ai_patch_diff = models.TextField(blank=True, null=True)
+    confidence = models.FloatField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

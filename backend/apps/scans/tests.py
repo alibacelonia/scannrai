@@ -100,6 +100,10 @@ class ScanApiTests(APITestCase):
                 self.assertIn('snippet', finding_detail_response.data)
                 self.assertEqual(finding_detail_response.data['snippet']['lines'][0]['line_number'], 1)
 
+                ai_summary_response = self.client.post(f'/api/scans/{scan_id}/ai/summary/')
+                self.assertEqual(ai_summary_response.status_code, status.HTTP_200_OK)
+                self.assertIn('ai_summary', ai_summary_response.data)
+
     def test_missing_repo_source_marks_scan_failed(self):
         with tempfile.TemporaryDirectory() as workspace:
             with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):

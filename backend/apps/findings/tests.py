@@ -4,6 +4,8 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from apps.projects.models import Project
 from apps.scans.models import Scan, ScanStatus
@@ -123,3 +125,36 @@ class FindingNormalizationTests(TestCase):
         gitleaks_finding = Finding.objects.get(scan=self.scan, tool=FindingTool.GITLEAKS)
         self.assertEqual(gitleaks_finding.raw['Secret'], '***REDACTED***')
         self.assertEqual(gitleaks_finding.raw['Match'], '***REDACTED***')
+
+
+class FindingAiEndpointsTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='aiuser',
+            email='aiuser@example.com',
+            password='password123',
+        )
+        self.client.force_authenticate(self.user)
+        self.project = Project.objects.create(name='AI Project', created_by=self.user)
+        self.scan = Scan.objects.create(project=self.project, status=ScanStatus.COMPLETED)
+        self.finding = Finding.objects.create(
+            scan=self.scan,
+            tool=FindingTool.SEMGREP,
+            severity=FindingSeverity.HIGH,
+            category='Injection',
+            file_path='src/app.py',
+            line_start=4,
+            line_end=4,
+            raw={'detail': 'Potential issue'},
+            fingerprint='ai-test-fingerprint',
+        )
+
+    def test_ai_explain_and_patch(self):
+        explain_response = self.client.post(f'/api/findings/{self.finding.id}/ai/explain/')
+        self.assertEqual(explain_response.status_code, status.HTTP_200_OK)
+        self.assertIn('ai_explanation', explain_response.data)
+        self.assertIn('confidence', explain_response.data)
+
+        patch_response = self.client.post(f'/api/findings/{self.finding.id}/ai/patch/')
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertIn('ai_patch_diff', patch_response.data)

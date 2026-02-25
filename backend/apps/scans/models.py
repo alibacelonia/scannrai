@@ -17,6 +17,7 @@ class Scan(models.Model):
     started_at = models.DateTimeField(blank=True, null=True)
     finished_at = models.DateTimeField(blank=True, null=True)
     meta = models.JSONField(default=dict, blank=True)
+    ai_summary = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

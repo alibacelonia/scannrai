@@ -19,6 +19,10 @@ class FindingSerializer(serializers.ModelSerializer):
             'line_end',
             'raw',
             'fingerprint',
+            'ai_explanation',
+            'ai_fix_suggestion',
+            'ai_patch_diff',
+            'confidence',
             'created_at',
         )
         read_only_fields = ('id', 'created_at')

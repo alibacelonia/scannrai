@@ -111,11 +111,11 @@
 ---
 
 ## 8) AI layer (optional but recommended)
-- [ ] Redaction pipeline (mask secrets + minimize code sent)
-- [ ] AI scan summary endpoint + storage
-- [ ] AI finding explanation endpoint + storage
-- [ ] AI patch generation endpoint (unified diff per file)
-- [ ] Confidence score + “Review before applying” warning
+- [x] Redaction pipeline (mask secrets + minimize code sent)
+- [x] AI scan summary endpoint + storage
+- [x] AI finding explanation endpoint + storage
+- [x] AI patch generation endpoint (unified diff per file)
+- [x] Confidence score + “Review before applying” warning
 
 **Definition of done:** AI adds clear value without leaking secrets.
 

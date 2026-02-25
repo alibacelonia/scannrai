@@ -21,11 +21,12 @@ class ScanSerializer(serializers.ModelSerializer):
             'started_at',
             'finished_at',
             'meta',
+            'ai_summary',
             'created_at',
             'updated_at',
             'summary',
         )
-        read_only_fields = ('id', 'project', 'created_at', 'updated_at', 'summary')
+        read_only_fields = ('id', 'project', 'created_at', 'updated_at', 'summary', 'ai_summary')
 
     def get_summary(self, obj: Scan) -> dict[str, int]:
         rows = obj.findings.values('severity').order_by().annotate(total=Count('id'))

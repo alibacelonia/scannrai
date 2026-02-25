@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.findings.serializers import FindingSerializer
+from apps.scans.ai import REVIEW_WARNING, build_scan_summary
 
 from .models import Scan
 from .serializers import ScanSerializer
@@ -41,3 +42,11 @@ class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
         serializer = FindingSerializer(queryset, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='ai/summary')
+    def ai_summary(self, request, pk=None):
+        scan = self.get_object()
+        summary = build_scan_summary(scan)
+        scan.ai_summary = summary
+        scan.save(update_fields=['ai_summary', 'updated_at'])
+        return Response({'scan_id': scan.id, 'ai_summary': summary, 'warning': REVIEW_WARNING})
