@@ -51,6 +51,8 @@ flowchart LR
 2. Review and adjust values if needed:
    - `DJANGO_SECRET_KEY`
    - `POSTGRES_*`
+   - `POSTGRES_HOST_PORT` (host binding; default `5433`)
+   - `REDIS_HOST_PORT` (host binding; default `6380`)
    - `NEXT_PUBLIC_API_BASE_URL`
    - `SCAN_*` settings (timeouts, retention, rate limits)
 
@@ -69,6 +71,8 @@ flowchart LR
 - Frontend UI: [http://localhost:3000](http://localhost:3000)
 - Backend API root (via routes): [http://localhost:8000/api/](http://localhost:8000/api/)
 - Health endpoint: [http://localhost:8000/api/health/](http://localhost:8000/api/health/)
+- Postgres host port: `localhost:${POSTGRES_HOST_PORT:-5433}`
+- Redis host port: `localhost:${REDIS_HOST_PORT:-6380}`
 
 ### 4) First Use
 1. Open `/register` in the frontend and create an account.

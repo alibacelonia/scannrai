@@ -382,3 +382,17 @@
 - `curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/tags/v8.24.2 | rg browser_download_url`
 - `docker compose build scanner worker`
 
+## 2026-02-26 — Incident fix: docker compose port conflict on 5432
+- Investigated `docker compose up` failure: host port `5432` already in use.
+- Applied compose hardening for local compatibility:
+  - Postgres host binding changed to `${POSTGRES_HOST_PORT:-5433}:5432`
+  - Redis host binding changed to `${REDIS_HOST_PORT:-6380}:6379`
+- Updated `.env.example` with new host port variables.
+- Updated README setup docs with host-port override guidance.
+- Logged incident details in `docs/error-logs/2026-02-26-compose-postgres-port-conflict.md`.
+- Verified by running:
+  - `docker compose down`
+  - `docker compose up -d`
+  - `docker compose ps` (all services running)
+  - `curl http://localhost:8000/api/health/` => `{"status": "ok"}`
+
