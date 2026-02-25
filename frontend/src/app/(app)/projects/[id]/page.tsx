@@ -10,6 +10,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError, createScan, getProject, listProjectScans } from "@/lib/api";
 import type { Project, Scan } from "@/types/api";
 
+function formatUtcTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`;
+}
+
 export default function ProjectPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -110,7 +120,7 @@ export default function ProjectPage() {
             >
               <div>
                 <p className="font-medium">Scan #{scan.id}</p>
-                <p className="text-xs text-[var(--ink-muted)]">{new Date(scan.created_at).toLocaleString()}</p>
+                <p className="text-xs text-[var(--ink-muted)]">{formatUtcTimestamp(scan.created_at)}</p>
               </div>
               <Badge
                 variant={

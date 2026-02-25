@@ -11,3 +11,4 @@ This folder tracks build/runtime incidents with:
 - [2026-02-26 scanner build failure on ARM64 (OSV asset 404)](./2026-02-26-scanner-build-arm64-osv-404.md)
 - [2026-02-26 docker compose startup failure (Postgres host port conflict)](./2026-02-26-compose-postgres-port-conflict.md)
 - [2026-02-26 account registration failure from frontend (CORS)](./2026-02-26-register-account-cors-failure.md)
+- [2026-02-26 hydration mismatch in SSR/client output](./2026-02-26-hydration-mismatch-ssr-client-render.md)

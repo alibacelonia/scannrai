@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
-import { getAccessToken } from "@/lib/auth";
+import { getAccessToken, subscribeToAuthToken } from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const token = getAccessToken();
+  const token = useSyncExternalStore(subscribeToAuthToken, getAccessToken, () => null);
 
   useEffect(() => {
     if (!token) {

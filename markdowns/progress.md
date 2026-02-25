@@ -406,3 +406,10 @@
   - preflight includes `access-control-allow-origin`
   - cross-origin register call returns 201
 
+## 2026-02-26 — Incident fix: hydration mismatch warning
+- Investigated hydration warning caused by server/client render mismatch.
+- Fixed `AuthGate` to use `useSyncExternalStore` with SSR-safe auth snapshot.
+- Replaced locale-dependent `toLocaleString()` timestamp rendering with deterministic UTC formatting.
+- Added permanent incident reference in `docs/error-logs/2026-02-26-hydration-mismatch-ssr-client-render.md`.
+- Verified frontend passes lint and production build after the fix.
+
