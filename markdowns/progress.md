@@ -126,3 +126,30 @@
 ### Next task
 - Section 5: normalize Semgrep/OSV/Gitleaks results into `Finding` records with fingerprint dedupe and scan severity summary counts.
 
+## 2026-02-26 — Section 5 Normalization + dedupe completed
+- Added normalization pipeline in `apps/findings/normalizers.py`:
+  - Semgrep JSON -> Finding records
+  - OSV JSON -> Finding records with CVSS-to-severity mapping
+  - Gitleaks JSON -> Finding records with secret-value masking in raw payload
+- Added fingerprint hashing and per-scan dedupe before persistence.
+- Added DB-level dedupe constraint: unique `(scan, fingerprint)`.
+- Added summary count computation and persisted summary metadata on each scan.
+- Wired normalization into both synchronous scan flow and Celery task flow.
+- Added focused tests to verify normalization, dedupe, and secret masking behavior.
+
+### Files changed
+- `backend/apps/findings/normalizers.py`
+- `backend/apps/findings/models.py`
+- `backend/apps/findings/migrations/0002_finding_unique_scan_fingerprint.py`
+- `backend/apps/findings/tests.py`
+- `backend/apps/projects/views.py`
+- `backend/apps/scans/tasks.py`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `/Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py makemigrations findings`
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.projects.tests apps.scans.tests apps.findings.tests`
+
+### Next task
+- Section 6: scaffold Next.js + shadcn frontend and connect dashboard/project/scan pages to backend APIs.
+

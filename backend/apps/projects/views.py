@@ -5,6 +5,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.findings.normalizers import normalize_and_store_findings
 from apps.scans.models import Scan, ScanStatus
 from apps.scans.serializers import ScanCreateSerializer, ScanSerializer
 from apps.scans.services import cleanup_scan_workspace, ingest_scan_source
@@ -50,6 +51,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
             tool_runs, tool_output_paths = run_all_tools(scan.id, repo_dir)
             scan.meta['tool_runs'] = tool_runs
             scan.meta['tool_output_paths'] = tool_output_paths
+            normalization = normalize_and_store_findings(scan, tool_output_paths)
+            scan.meta['normalization'] = normalization
+            scan.meta['summary_counts'] = normalization['summary_counts']
             scan.status = ScanStatus.COMPLETED
         except Exception as exc:
             meta = dict(scan.meta or {})

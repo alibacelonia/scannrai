@@ -3,6 +3,8 @@ from pathlib import Path
 from django.utils import timezone
 from celery import shared_task
 
+from apps.findings.normalizers import normalize_and_store_findings
+
 from .models import Scan, ScanStatus
 from .services import cleanup_scan_workspace, ingest_scan_from_zip_path, ingest_scan_source
 from .tool_runners import run_all_tools
@@ -36,6 +38,9 @@ def scan_repo(scan_id: int, zip_path: str | None = None) -> str:
         tool_runs, tool_output_paths = run_all_tools(scan.id, repo_dir)
         scan.meta['tool_runs'] = tool_runs
         scan.meta['tool_output_paths'] = tool_output_paths
+        normalization = normalize_and_store_findings(scan, tool_output_paths)
+        scan.meta['normalization'] = normalization
+        scan.meta['summary_counts'] = normalization['summary_counts']
         scan.status = ScanStatus.COMPLETED
     except Exception as exc:
         meta = dict(scan.meta or {})

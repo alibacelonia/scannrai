@@ -31,6 +31,9 @@ class Finding(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['scan', 'fingerprint'], name='unique_scan_fingerprint'),
+        ]
 
     def __str__(self) -> str:
         return f'{self.tool}:{self.severity}:{self.category}'

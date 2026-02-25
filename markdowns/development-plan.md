@@ -75,11 +75,11 @@
 ---
 
 ## 5) Normalization + dedupe
-- [ ] Normalize Semgrep → Finding schema
-- [ ] Normalize OSV → Finding schema
-- [ ] Normalize Gitleaks → Finding schema (mask secrets)
-- [ ] Implement fingerprinting + dedupe per scan
-- [ ] Compute scan summary counts (critical/high/medium/low/info)
+- [x] Normalize Semgrep → Finding schema
+- [x] Normalize OSV → Finding schema
+- [x] Normalize Gitleaks → Finding schema (mask secrets)
+- [x] Implement fingerprinting + dedupe per scan
+- [x] Compute scan summary counts (critical/high/medium/low/info)
 
 **Definition of done:** Findings render in API with consistent fields and correct severities.
 
