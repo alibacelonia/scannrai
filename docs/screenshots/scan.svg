@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#fff7ed"/>
+  <rect x="40" y="40" width="1120" height="160" rx="18" fill="#ffffff" stroke="#dbe2ea"/>
+  <rect x="40" y="220" width="1120" height="440" rx="18" fill="#ffffff" stroke="#dbe2ea"/>
+  <rect x="70" y="110" width="1060" height="10" rx="5" fill="#1d4ed8"/>
+  <rect x="70" y="280" width="1060" height="42" rx="8" fill="#f1f5f9"/>
+  <rect x="70" y="338" width="1060" height="42" rx="8" fill="#f1f5f9"/>
+  <rect x="70" y="396" width="1060" height="42" rx="8" fill="#f1f5f9"/>
+  <text x="70" y="80" font-size="24" font-family="monospace" fill="#1f2937">Scan Detail</text>
+</svg>

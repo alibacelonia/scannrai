@@ -320,3 +320,30 @@
 ### Next task
 - Section 11: portfolio finish (README architecture/setup/docs + optional demo assets).
 
+## 2026-02-26 — Section 11 Portfolio finish (partial) completed
+- Added project README (`README.md`) with:
+  - architecture diagram
+  - feature list
+  - local setup instructions
+  - screenshots section
+- Added portfolio/demo assets:
+  - `seed/demo-repo/` vulnerable demo codebase
+  - `seed/sample-results/sample-scan-export.json`
+  - `seed/sample-results/sample-scan-report.md`
+- Added screenshot assets for documentation:
+  - `docs/screenshots/dashboard.svg`
+  - `docs/screenshots/scan.svg`
+
+### Files changed
+- `README.md`
+- `seed/demo-repo/*`
+- `seed/sample-results/*`
+- `docs/screenshots/*`
+- `markdowns/development-plan.md`
+
+### Commands run
+- Documentation/asset generation only (no runtime command required)
+
+### Next task
+- Optional: record demo video and complete release checklist validation passes.
+

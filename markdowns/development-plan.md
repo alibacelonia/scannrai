@@ -139,12 +139,12 @@
 ---
 
 ## 11) Portfolio finish
-- [ ] Write README with:
+- [x] Write README with:
   - architecture diagram
   - feature list
   - local setup steps
   - screenshots
-- [ ] Add seed demo project + sample scan results
+- [x] Add seed demo project + sample scan results
 - [ ] Record a short demo video (optional)
 
 ---

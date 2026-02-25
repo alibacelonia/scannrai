@@ -1,0 +1,45 @@
+{
+  "scan": {
+    "id": 101,
+    "project": 1,
+    "status": "completed",
+    "commit_hash": "demo-hash",
+    "ai_summary": "Risk score: 61/100. Prioritize high severity findings first."
+  },
+  "summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 1,
+    "low": 0,
+    "info": 0
+  },
+  "findings": [
+    {
+      "id": 1,
+      "tool": "semgrep",
+      "severity": "high",
+      "category": "python.sql.injection",
+      "file_path": "app.py",
+      "line_start": 7,
+      "line_end": 7
+    },
+    {
+      "id": 2,
+      "tool": "gitleaks",
+      "severity": "high",
+      "category": "Secrets",
+      "file_path": "app.py",
+      "line_start": 3,
+      "line_end": 3
+    },
+    {
+      "id": 3,
+      "tool": "osv",
+      "severity": "medium",
+      "category": "Dependency Vulnerability",
+      "file_path": "requirements.txt",
+      "line_start": null,
+      "line_end": null
+    }
+  ]
+}
