@@ -131,10 +131,10 @@
 ---
 
 ## 10) Hardening
-- [ ] Rate limit scans per user (simple)
-- [ ] Per-tool execution timeouts
-- [ ] Scan retention policy config
-- [ ] Basic audit log events (scan started/finished/failed)
+- [x] Rate limit scans per user (simple)
+- [x] Per-tool execution timeouts
+- [x] Scan retention policy config
+- [x] Basic audit log events (scan started/finished/failed)
 
 ---
 

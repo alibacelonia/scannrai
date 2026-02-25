@@ -288,3 +288,35 @@
 ### Next task
 - Section 10: hardening (scan rate limits, timeout controls, retention enforcement cleanup, and basic audit events).
 
+## 2026-02-26 — Section 10 Hardening completed
+- Added scan rate limiting (`SCAN_RATE_LIMIT_PER_HOUR`) with 429 response when exceeded.
+- Confirmed per-tool timeout controls remain enforced through `SCAN_TOOL_TIMEOUT_SECONDS`.
+- Confirmed scan retention cleanup remains configurable via `SCAN_RETENTION_SECONDS`.
+- Added audit trail model and event logging:
+  - `scan_started`
+  - `scan_completed`
+  - `scan_failed`
+- Wired audit event creation in both API-triggered and Celery task-triggered scan execution flows.
+- Added tests covering:
+  - rate-limit behavior
+  - audit event creation
+
+### Files changed
+- `backend/apps/scans/models.py`
+- `backend/apps/scans/migrations/0003_auditlog.py`
+- `backend/apps/scans/audit.py`
+- `backend/apps/scans/admin.py`
+- `backend/apps/projects/views.py`
+- `backend/apps/scans/tasks.py`
+- `backend/apps/scans/tests.py`
+- `backend/scannrai/settings.py`
+- `.env.example`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `/Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py makemigrations scans`
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+
+### Next task
+- Section 11: portfolio finish (README architecture/setup/docs + optional demo assets).
+

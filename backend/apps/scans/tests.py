@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 
 from apps.findings.models import Finding, FindingSeverity, FindingTool
 from apps.projects.models import Project
+from apps.scans.models import AuditEventType, AuditLog
 from apps.scans.tool_runners import run_osv_scanner
 
 
@@ -58,6 +59,10 @@ class ScanApiTests(APITestCase):
                 self.assertTrue(workspace_path.exists())
                 for output_path in create_scan_response.data['meta']['tool_output_paths'].values():
                     self.assertTrue(Path(output_path).exists())
+
+                audit_events = list(AuditLog.objects.filter(scan_id=create_scan_response.data['id']).values_list('event_type', flat=True))
+                self.assertIn(AuditEventType.SCAN_STARTED, audit_events)
+                self.assertIn(AuditEventType.SCAN_COMPLETED, audit_events)
 
                 scan_id = create_scan_response.data['id']
 
@@ -154,6 +159,29 @@ class ScanApiTests(APITestCase):
             self.assertEqual(response.data['status'], 'completed')
             self.assertEqual(response.data['commit_hash'], commit_id)
             self.assertEqual(response.data['meta']['source'], 'git')
+
+    def test_scan_rate_limit_returns_429(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600, SCAN_RATE_LIMIT_PER_HOUR=1):
+                first_response = self.client.post(
+                    f'/api/projects/{self.project.id}/scans/',
+                    {
+                        'meta': '{"source_hint":"upload"}',
+                        'zip_file': self._build_zip_upload('first.zip'),
+                    },
+                    format='multipart',
+                )
+                self.assertEqual(first_response.status_code, status.HTTP_201_CREATED)
+
+                second_response = self.client.post(
+                    f'/api/projects/{self.project.id}/scans/',
+                    {
+                        'meta': '{"source_hint":"upload"}',
+                        'zip_file': self._build_zip_upload('second.zip'),
+                    },
+                    format='multipart',
+                )
+                self.assertEqual(second_response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
 class ToolRunnerTests(SimpleTestCase):
