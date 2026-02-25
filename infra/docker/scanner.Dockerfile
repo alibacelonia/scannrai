@@ -22,8 +22,16 @@ RUN set -eux; \
       arm64) osv_arch="arm64"; gitleaks_arch="arm64" ;; \
       *) echo "Unsupported architecture: $arch"; exit 1 ;; \
     esac; \
-    curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_${OSV_SCANNER_VERSION}_linux_${osv_arch}.tar.gz" \
-      | tar -xz -C /usr/local/bin osv-scanner; \
+    # OSV Scanner release assets changed across versions:
+    # - newer tags expose direct binaries: osv-scanner_linux_<arch>
+    # - older tags may expose tar.gz archives
+    if curl -fSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_${osv_arch}" \
+      -o /usr/local/bin/osv-scanner; then \
+      true; \
+    else \
+      curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_${OSV_SCANNER_VERSION}_linux_${osv_arch}.tar.gz" \
+        | tar -xz -C /usr/local/bin osv-scanner; \
+    fi; \
     chmod +x /usr/local/bin/osv-scanner; \
     curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${gitleaks_arch}.tar.gz" \
       | tar -xz -C /tmp; \

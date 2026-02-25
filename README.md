@@ -103,3 +103,4 @@ flowchart LR
 ## Notes
 - Docker daemon must be running for full compose startup.
 - If local `git` is unavailable on macOS, scan ingestion falls back to Dulwich clone logic.
+- Build/runtime troubleshooting entries are tracked in `docs/error-logs/`.

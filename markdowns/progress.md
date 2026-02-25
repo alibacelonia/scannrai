@@ -362,3 +362,23 @@
 ### Remaining release item
 - Happy-path full dockerized scan demo is still pending (Docker daemon unavailable in this environment).
 
+## 2026-02-26 — Incident fix: ARM64 scanner build 404
+- Investigated scanner image build failure on ARM64 (`osv-scanner` asset 404).
+- Root cause: OSV v1.9.2 release asset is a direct binary (`osv-scanner_linux_arm64`), not a tarball.
+- Updated `infra/docker/scanner.Dockerfile` to use resilient install logic:
+  - primary: direct binary URL
+  - fallback: legacy tarball URL
+- Added persistent incident docs under `docs/error-logs/` for future reference.
+- Verified fix by running `docker compose build scanner worker` successfully.
+
+### Files changed
+- `infra/docker/scanner.Dockerfile`
+- `docs/error-logs/README.md`
+- `docs/error-logs/2026-02-26-scanner-build-arm64-osv-404.md`
+- `README.md`
+
+### Commands run
+- `curl -fsSL https://api.github.com/repos/google/osv-scanner/releases/tags/v1.9.2 | rg browser_download_url`
+- `curl -fsSL https://api.github.com/repos/gitleaks/gitleaks/releases/tags/v8.24.2 | rg browser_download_url`
+- `docker compose build scanner worker`
+
