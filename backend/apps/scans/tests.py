@@ -79,8 +79,8 @@ class ScanApiTests(APITestCase):
                     severity=FindingSeverity.HIGH,
                     category='Injection',
                     file_path='src/app.py',
-                    line_start=10,
-                    line_end=12,
+                    line_start=1,
+                    line_end=1,
                     raw={'rule': 'test-rule'},
                     fingerprint='abc-fingerprint',
                 )
@@ -90,9 +90,15 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(filtered_findings_response.data['count'], 1)
                 self.assertEqual(filtered_findings_response.data['results'][0]['id'], finding.id)
 
+                category_response = self.client.get(f'/api/scans/{scan_id}/findings/?category=ject')
+                self.assertEqual(category_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(category_response.data['count'], 1)
+
                 finding_detail_response = self.client.get(f'/api/findings/{finding.id}/')
                 self.assertEqual(finding_detail_response.status_code, status.HTTP_200_OK)
                 self.assertEqual(finding_detail_response.data['fingerprint'], 'abc-fingerprint')
+                self.assertIn('snippet', finding_detail_response.data)
+                self.assertEqual(finding_detail_response.data['snippet']['lines'][0]['line_number'], 1)
 
     def test_missing_repo_source_marks_scan_failed(self):
         with tempfile.TemporaryDirectory() as workspace:

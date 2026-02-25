@@ -1,7 +1,7 @@
 from rest_framework import mixins, permissions, viewsets
 
 from .models import Finding
-from .serializers import FindingSerializer
+from .serializers import FindingDetailSerializer, FindingSerializer
 
 
 class FindingViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -10,3 +10,8 @@ class FindingViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     def get_queryset(self):
         return Finding.objects.filter(scan__project__created_by=self.request.user).select_related('scan')
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return FindingDetailSerializer
+        return FindingSerializer

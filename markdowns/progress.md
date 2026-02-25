@@ -189,3 +189,36 @@
 ### Next task
 - Section 7: findings UX polish (filters, detail drawer enhancements, better status polling/progress, and empty/skeleton states).
 
+## 2026-02-26 — Section 7 Findings UX polish completed
+- Upgraded findings filters in API/UI:
+  - category filtering now supports partial matching (`icontains`)
+  - severity/tool/category/file filters are exposed in the scan UI
+- Implemented finding detail drawer on scan page with tabs:
+  - `Code Snippet` tab with line-level highlighting
+  - `Raw JSON` tab for full payload inspection
+- Added backend snippet enrichment for finding detail (`snippet` block) with safe repo-path guarding.
+- Improved scan status UX:
+  - periodic polling for queued/running scans
+  - progress bar indicator tied to scan status
+- Added better loading and empty-state visuals:
+  - scan-page skeleton loader
+  - findings table skeleton rows while scan is running
+  - clearer empty-state messaging
+
+### Files changed
+- `backend/apps/findings/serializers.py`
+- `backend/apps/findings/views.py`
+- `backend/apps/scans/views.py`
+- `backend/apps/scans/tests.py`
+- `frontend/src/app/(app)/scans/[id]/page.tsx`
+- `frontend/src/components/auth-gate.tsx`
+- `frontend/src/types/api.ts`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+- `npm run lint && npm run build` (frontend)
+
+### Next task
+- Section 8: implement AI layer endpoints (redaction + summary/explain/patch scaffolding).
+

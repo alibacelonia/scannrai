@@ -42,6 +42,15 @@ export interface Finding {
   raw: Record<string, unknown>;
   fingerprint: string;
   created_at: string;
+  snippet?: {
+    start_line: number;
+    end_line: number;
+    lines: Array<{
+      line_number: number;
+      content: string;
+      highlighted: boolean;
+    }>;
+  } | null;
 }
 
 export interface TokenPair {

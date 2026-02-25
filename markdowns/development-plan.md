@@ -99,12 +99,12 @@
 ---
 
 ## 7) Findings UX polish
-- [ ] Filters: severity, tool, category, file path search
-- [ ] Finding detail drawer:
-  - [ ] code snippet viewer with line highlight
-  - [ ] raw JSON tab
-- [ ] Status polling + progress indicator
-- [ ] Empty states + skeleton loaders
+- [x] Filters: severity, tool, category, file path search
+- [x] Finding detail drawer:
+  - [x] code snippet viewer with line highlight
+  - [x] raw JSON tab
+- [x] Status polling + progress indicator
+- [x] Empty states + skeleton loaders
 
 **Definition of done:** Scan view feels like a real product.
 

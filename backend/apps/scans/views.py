@@ -30,7 +30,7 @@ class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         if tool:
             queryset = queryset.filter(tool=tool)
         if category:
-            queryset = queryset.filter(category=category)
+            queryset = queryset.filter(category__icontains=category)
         if file_query:
             queryset = queryset.filter(file_path__icontains=file_query)
 

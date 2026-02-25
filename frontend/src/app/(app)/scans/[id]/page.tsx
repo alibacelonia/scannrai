@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ export default function ScanPage() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [detailTab, setDetailTab] = useState<"snippet" | "raw">("snippet");
 
   const [severity, setSeverity] = useState<"" | Severity>("");
   const [tool, setTool] = useState<"" | Tool>("");
@@ -27,21 +28,6 @@ export default function ScanPage() {
   const [fileQuery, setFileQuery] = useState("");
 
   const [error, setError] = useState<string | null>(null);
-
-  const fetchScan = useCallback(async () => {
-    const data = await getScan(scanId);
-    setScan(data);
-  }, [scanId]);
-
-  const fetchFindings = useCallback(async () => {
-    const data = await listScanFindings(scanId, {
-      severity: severity || undefined,
-      tool: tool || undefined,
-      category: category || undefined,
-      file: fileQuery || undefined,
-    });
-    setFindings(data.results);
-  }, [category, fileQuery, scanId, severity, tool]);
 
   useEffect(() => {
     let mounted = true;
@@ -104,19 +90,34 @@ export default function ScanPage() {
     }
 
     const timer = setInterval(() => {
-      void fetchScan();
-      void fetchFindings();
+      void getScan(scanId).then(setScan).catch(() => undefined);
+      void listScanFindings(scanId, {
+        severity: severity || undefined,
+        tool: tool || undefined,
+        category: category || undefined,
+        file: fileQuery || undefined,
+      })
+        .then((data) => setFindings(data.results))
+        .catch(() => undefined);
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [fetchFindings, fetchScan, scan]);
+  }, [category, fileQuery, scan, scanId, severity, tool]);
 
   const summary = useMemo(() => scan?.summary ?? { critical: 0, high: 0, medium: 0, low: 0, info: 0 }, [scan]);
+
+  const progress = useMemo(() => {
+    if (!scan) return 5;
+    if (scan.status === "queued") return 25;
+    if (scan.status === "running") return 65;
+    return 100;
+  }, [scan]);
 
   const openFinding = async (findingId: number) => {
     try {
       const detail = await getFinding(findingId);
       setSelectedFinding(detail);
+      setDetailTab("snippet");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -125,7 +126,7 @@ export default function ScanPage() {
   };
 
   if (!scan) {
-    return <p className="text-sm text-[var(--ink-muted)]">Loading scan...</p>;
+    return <ScanSkeleton />;
   }
 
   return (
@@ -149,12 +150,20 @@ export default function ScanPage() {
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-5">
-          <Metric label="Critical" value={summary.critical} />
-          <Metric label="High" value={summary.high} />
-          <Metric label="Medium" value={summary.medium} />
-          <Metric label="Low" value={summary.low} />
-          <Metric label="Info" value={summary.info} />
+        <CardContent className="space-y-4">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--muted)]">
+            <div
+              className="h-full rounded-full bg-[var(--brand-600)] transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="grid gap-3 md:grid-cols-5">
+            <Metric label="Critical" value={summary.critical} />
+            <Metric label="High" value={summary.high} />
+            <Metric label="Medium" value={summary.medium} />
+            <Metric label="Low" value={summary.low} />
+            <Metric label="Info" value={summary.info} />
+          </div>
         </CardContent>
       </Card>
 
@@ -202,11 +211,15 @@ export default function ScanPage() {
             </TableHeader>
             <TableBody>
               {findings.length === 0 ? (
-                <TableRow>
-                  <TableCell className="text-[var(--ink-muted)]" colSpan={5}>
-                    No findings for this filter.
-                  </TableCell>
-                </TableRow>
+                scan.status === "running" || scan.status === "queued" ? (
+                  <FindingSkeletonRows />
+                ) : (
+                  <TableRow>
+                    <TableCell className="text-[var(--ink-muted)]" colSpan={5}>
+                      No findings for this filter.
+                    </TableCell>
+                  </TableRow>
+                )
               ) : (
                 findings.map((finding) => (
                   <TableRow
@@ -234,16 +247,59 @@ export default function ScanPage() {
       </Card>
 
       {selectedFinding ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Finding detail #{selectedFinding.id}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <pre className="max-h-96 overflow-auto rounded-xl bg-[var(--ink)] p-4 text-xs text-white">
-              {JSON.stringify(selectedFinding.raw, null, 2)}
-            </pre>
-          </CardContent>
-        </Card>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/30 p-2 md:p-6">
+          <div className="flex h-full w-full max-w-2xl flex-col rounded-2xl border border-[var(--border)] bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+              <p className="font-semibold">Finding #{selectedFinding.id}</p>
+              <button
+                className="rounded-lg border border-[var(--border)] px-3 py-1 text-sm hover:bg-[var(--muted)]"
+                onClick={() => setSelectedFinding(null)}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex gap-2 border-b border-[var(--border)] px-5 py-3 text-sm">
+              <button
+                className={`rounded-lg px-3 py-1 ${detailTab === "snippet" ? "bg-[var(--brand-100)] text-[var(--brand-700)]" : "bg-[var(--muted)]"}`}
+                onClick={() => setDetailTab("snippet")}
+                type="button"
+              >
+                Code Snippet
+              </button>
+              <button
+                className={`rounded-lg px-3 py-1 ${detailTab === "raw" ? "bg-[var(--brand-100)] text-[var(--brand-700)]" : "bg-[var(--muted)]"}`}
+                onClick={() => setDetailTab("raw")}
+                type="button"
+              >
+                Raw JSON
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {detailTab === "snippet" ? (
+                selectedFinding.snippet?.lines?.length ? (
+                  <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#0f172a] text-xs text-slate-100">
+                    {selectedFinding.snippet.lines.map((line) => (
+                      <div
+                        className={`grid grid-cols-[56px_1fr] px-3 py-1 ${line.highlighted ? "bg-[#1e293b]" : ""}`}
+                        key={line.line_number}
+                      >
+                        <span className="text-slate-400">{line.line_number}</span>
+                        <code className="whitespace-pre-wrap">{line.content || " "}</code>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--ink-muted)]">No snippet available for this finding.</p>
+                )
+              ) : (
+                <pre className="overflow-auto rounded-xl bg-[var(--ink)] p-4 text-xs text-white">
+                  {JSON.stringify(selectedFinding.raw, null, 2)}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
@@ -257,5 +313,28 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
+  );
+}
+
+function ScanSkeleton() {
+  return (
+    <div className="space-y-5 animate-pulse">
+      <div className="h-40 rounded-2xl border border-[var(--border)] bg-[var(--muted)]" />
+      <div className="h-96 rounded-2xl border border-[var(--border)] bg-[var(--muted)]" />
+    </div>
+  );
+}
+
+function FindingSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 3 }).map((_, idx) => (
+        <TableRow key={`skeleton-${idx}`}>
+          <TableCell colSpan={5}>
+            <div className="h-4 w-full animate-pulse rounded bg-[var(--muted)]" />
+          </TableCell>
+        </TableRow>
+      ))}
+    </>
   );
 }
