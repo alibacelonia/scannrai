@@ -160,6 +160,25 @@ class ScanApiTests(APITestCase):
             self.assertEqual(response.data['commit_hash'], commit_id)
             self.assertEqual(response.data['meta']['source'], 'git')
 
+    def test_invalid_repo_url_returns_failed_scan_with_error(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            invalid_project = Project.objects.create(
+                name='Invalid Repo',
+                created_by=self.user,
+                repo_url='file:///definitely-not-a-real-repo-path',
+            )
+
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                response = self.client.post(
+                    f'/api/projects/{invalid_project.id}/scans/',
+                    {'meta': {'source_hint': 'invalid-repo'}},
+                    format='json',
+                )
+
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data['status'], 'failed')
+            self.assertIn('ingestion_error', response.data['meta'])
+
     def test_scan_rate_limit_returns_429(self):
         with tempfile.TemporaryDirectory() as workspace:
             with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600, SCAN_RATE_LIMIT_PER_HOUR=1):

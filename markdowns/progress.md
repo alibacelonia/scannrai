@@ -347,3 +347,18 @@
 ### Next task
 - Optional: record demo video and complete release checklist validation passes.
 
+## 2026-02-26 — Release checklist partial validation
+- Added/validated failure-path behavior for invalid repo URLs (scan marked failed with explicit ingestion error metadata).
+- Confirmed secret masking verification remains covered via normalization tests.
+- Confirmed documentation checklist item with updated README local setup and architecture sections.
+
+### Files changed
+- `backend/apps/scans/tests.py`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+
+### Remaining release item
+- Happy-path full dockerized scan demo is still pending (Docker daemon unavailable in this environment).
+

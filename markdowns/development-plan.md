@@ -151,6 +151,6 @@
 
 ## Release checklist
 - [ ] “Happy path” demo: public repo scan end-to-end
-- [ ] “Failure path” demo: invalid repo URL shows useful errors
-- [ ] Security: secret masking verified
-- [ ] Docs: clear local run instructions
+- [x] “Failure path” demo: invalid repo URL shows useful errors
+- [x] Security: secret masking verified
+- [x] Docs: clear local run instructions
