@@ -62,13 +62,13 @@
 ---
 
 ## 4) Tool execution (Semgrep + OSV + Gitleaks)
-- [ ] Add `scanner/` container (recommended) with pinned versions
+- [x] Add `scanner/` container (recommended) with pinned versions
 - [ ] Implement tool runners (called from Celery worker):
-  - [ ] Semgrep JSON output
-  - [ ] OSV Scanner JSON output
-  - [ ] Gitleaks JSON output
-- [ ] Add timeouts + safe subprocess execution
-- [ ] Store raw tool outputs on disk (optional) and/or in DB (`raw`)
+  - [x] Semgrep JSON output
+  - [x] OSV Scanner JSON output
+  - [x] Gitleaks JSON output
+- [x] Add timeouts + safe subprocess execution
+- [x] Store raw tool outputs on disk (optional) and/or in DB (`raw`)
 
 **Definition of done:** A scan runs all 3 tools and saves raw outputs.
 

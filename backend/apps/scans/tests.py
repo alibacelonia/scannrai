@@ -1,17 +1,20 @@
 import io
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from dulwich import porcelain
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import override_settings
+from django.test import SimpleTestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.findings.models import Finding, FindingSeverity, FindingTool
 from apps.projects.models import Project
+from apps.scans.tool_runners import run_osv_scanner
 
 
 class ScanApiTests(APITestCase):
@@ -48,9 +51,13 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(create_scan_response.data['status'], 'completed')
                 self.assertEqual(create_scan_response.data['meta']['source'], 'zip')
                 self.assertIn('snapshot_checksum', create_scan_response.data['meta'])
+                self.assertIn('tool_runs', create_scan_response.data['meta'])
+                self.assertIn('tool_output_paths', create_scan_response.data['meta'])
 
                 workspace_path = Path(create_scan_response.data['meta']['workspace_dir'])
                 self.assertTrue(workspace_path.exists())
+                for output_path in create_scan_response.data['meta']['tool_output_paths'].values():
+                    self.assertTrue(Path(output_path).exists())
 
                 scan_id = create_scan_response.data['id']
 
@@ -125,3 +132,20 @@ class ScanApiTests(APITestCase):
             self.assertEqual(response.data['status'], 'completed')
             self.assertEqual(response.data['commit_hash'], commit_id)
             self.assertEqual(response.data['meta']['source'], 'git')
+
+
+class ToolRunnerTests(SimpleTestCase):
+    def test_osv_runner_timeout_writes_error_payload(self):
+        with tempfile.TemporaryDirectory() as repo_dir, tempfile.TemporaryDirectory() as out_dir:
+            repo_path = Path(repo_dir)
+            output_path = Path(out_dir)
+            repo_path.joinpath('sample.txt').write_text('sample')
+
+            with patch(
+                'apps.scans.tool_runners.subprocess.run',
+                side_effect=subprocess.TimeoutExpired(cmd='osv-scanner', timeout=1),
+            ):
+                result = run_osv_scanner(repo_path, output_path, timeout_seconds=1)
+
+            self.assertTrue(result['timed_out'])
+            self.assertTrue(Path(result['output_path']).exists())

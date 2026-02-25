@@ -5,6 +5,7 @@ from celery import shared_task
 
 from .models import Scan, ScanStatus
 from .services import cleanup_scan_workspace, ingest_scan_from_zip_path, ingest_scan_source
+from .tool_runners import run_all_tools
 
 
 @shared_task
@@ -30,6 +31,11 @@ def scan_repo(scan_id: int, zip_path: str | None = None) -> str:
         scan.meta = meta
         if commit_hash:
             scan.commit_hash = commit_hash
+
+        repo_dir = Path(ingestion_meta['repo_dir'])
+        tool_runs, tool_output_paths = run_all_tools(scan.id, repo_dir)
+        scan.meta['tool_runs'] = tool_runs
+        scan.meta['tool_output_paths'] = tool_output_paths
         scan.status = ScanStatus.COMPLETED
     except Exception as exc:
         meta = dict(scan.meta or {})

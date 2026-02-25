@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -6,6 +8,7 @@ from rest_framework.response import Response
 from apps.scans.models import Scan, ScanStatus
 from apps.scans.serializers import ScanCreateSerializer, ScanSerializer
 from apps.scans.services import cleanup_scan_workspace, ingest_scan_source
+from apps.scans.tool_runners import run_all_tools
 
 from .models import Project
 from .serializers import ProjectSerializer
@@ -42,6 +45,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
             scan.meta = meta
             if commit_hash:
                 scan.commit_hash = commit_hash
+
+            repo_dir = Path(ingestion_meta['repo_dir'])
+            tool_runs, tool_output_paths = run_all_tools(scan.id, repo_dir)
+            scan.meta['tool_runs'] = tool_runs
+            scan.meta['tool_output_paths'] = tool_output_paths
             scan.status = ScanStatus.COMPLETED
         except Exception as exc:
             meta = dict(scan.meta or {})

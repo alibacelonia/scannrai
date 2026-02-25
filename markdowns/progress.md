@@ -95,3 +95,34 @@
 ### Next task
 - Section 4: add scanner container and implement Semgrep/OSV/Gitleaks tool runners with timeout-safe subprocess execution and raw output persistence.
 
+## 2026-02-26 — Section 4 Tool execution completed
+- Added scanner runtime module `apps/scans/tool_runners.py` with runners for:
+  - Semgrep (`semgrep.json`)
+  - OSV Scanner (`osv-scanner.json`)
+  - Gitleaks (`gitleaks.json`)
+- Implemented timeout-safe subprocess execution with structured run metadata (`exit_code`, `timed_out`, `duration`, `error`).
+- Wired tool execution into scan flow after repo ingestion and stored results in scan metadata:
+  - `meta.tool_runs`
+  - `meta.tool_output_paths`
+- Added `SCAN_TOOL_TIMEOUT_SECONDS` setting for per-tool timeout configuration.
+- Added scanner container image (`infra/docker/scanner.Dockerfile`) with pinned tool versions and compose service wiring.
+- Updated tests to validate tool output path creation and timeout handling logic.
+
+### Files changed
+- `backend/apps/scans/tool_runners.py`
+- `backend/apps/projects/views.py`
+- `backend/apps/scans/tasks.py`
+- `backend/apps/scans/tests.py`
+- `backend/scannrai/settings.py`
+- `infra/docker/scanner.Dockerfile`
+- `docker-compose.yml`
+- `.env.example`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.projects.tests apps.scans.tests`
+- `docker compose config`
+
+### Next task
+- Section 5: normalize Semgrep/OSV/Gitleaks results into `Finding` records with fingerprint dedupe and scan severity summary counts.
+
