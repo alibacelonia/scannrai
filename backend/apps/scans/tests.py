@@ -104,6 +104,14 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(ai_summary_response.status_code, status.HTTP_200_OK)
                 self.assertIn('ai_summary', ai_summary_response.data)
 
+                export_json_response = self.client.get(f'/api/scans/{scan_id}/export.json/')
+                self.assertEqual(export_json_response.status_code, status.HTTP_200_OK)
+                self.assertIn('findings', export_json_response.data)
+
+                export_md_response = self.client.get(f'/api/scans/{scan_id}/export.md/')
+                self.assertEqual(export_md_response.status_code, status.HTTP_200_OK)
+                self.assertIn('# ScannrAI Report', export_md_response.content.decode('utf-8'))
+
     def test_missing_repo_source_marks_scan_failed(self):
         with tempfile.TemporaryDirectory() as workspace:
             with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):

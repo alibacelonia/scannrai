@@ -4,10 +4,11 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ApiError, getFinding, getScan, listScanFindings } from "@/lib/api";
+import { ApiError, exportScanJson, exportScanMarkdown, getFinding, getScan, listScanFindings } from "@/lib/api";
 import type { Finding, Scan, Severity, Tool } from "@/types/api";
 
 const severityOptions: Array<"" | Severity> = ["", "critical", "high", "medium", "low", "info"];
@@ -125,6 +126,37 @@ export default function ScanPage() {
     }
   };
 
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadJson = async () => {
+    try {
+      const blob = await exportScanJson(scanId);
+      downloadBlob(blob, `scan-${scanId}.json`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      }
+    }
+  };
+
+  const downloadMarkdown = async () => {
+    try {
+      const blob = await exportScanMarkdown(scanId);
+      downloadBlob(blob, `scan-${scanId}.md`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      }
+    }
+  };
+
   if (!scan) {
     return <ScanSkeleton />;
   }
@@ -133,22 +165,32 @@ export default function ScanPage() {
     <div className="space-y-5">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Scan #{scan.id}</span>
-            <Badge
-              variant={
-                scan.status === "completed"
-                  ? "success"
-                  : scan.status === "failed"
-                    ? "danger"
-                    : scan.status === "running"
-                      ? "warning"
-                      : "default"
-              }
-            >
-              {scan.status}
-            </Badge>
-          </CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-3">
+              <span>Scan #{scan.id}</span>
+              <Badge
+                variant={
+                  scan.status === "completed"
+                    ? "success"
+                    : scan.status === "failed"
+                      ? "danger"
+                      : scan.status === "running"
+                        ? "warning"
+                        : "default"
+                }
+              >
+                {scan.status}
+              </Badge>
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button onClick={downloadJson} size="sm" variant="outline">
+                Export JSON
+              </Button>
+              <Button onClick={downloadMarkdown} size="sm" variant="outline">
+                Export Markdown
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--muted)]">

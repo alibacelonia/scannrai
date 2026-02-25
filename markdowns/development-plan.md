@@ -122,9 +122,9 @@
 ---
 
 ## 9) Export
-- [ ] Export JSON endpoint
-- [ ] Export Markdown report endpoint
-- [ ] UI: Download buttons
+- [x] Export JSON endpoint
+- [x] Export Markdown report endpoint
+- [x] UI: Download buttons
 
 **Definition of done:** User can export a scan report.
 

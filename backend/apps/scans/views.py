@@ -1,9 +1,11 @@
+from django.http import HttpResponse
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.findings.serializers import FindingSerializer
 from apps.scans.ai import REVIEW_WARNING, build_scan_summary
+from apps.scans.exporters import build_scan_export_json, build_scan_export_markdown
 
 from .models import Scan
 from .serializers import ScanSerializer
@@ -50,3 +52,17 @@ class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
         scan.ai_summary = summary
         scan.save(update_fields=['ai_summary', 'updated_at'])
         return Response({'scan_id': scan.id, 'ai_summary': summary, 'warning': REVIEW_WARNING})
+
+    @action(detail=True, methods=['get'], url_path=r'export\.json')
+    def export_json(self, request, pk=None):
+        scan = self.get_object()
+        payload = build_scan_export_json(scan)
+        return Response(payload)
+
+    @action(detail=True, methods=['get'], url_path=r'export\.md')
+    def export_markdown(self, request, pk=None):
+        scan = self.get_object()
+        markdown = build_scan_export_markdown(scan)
+        response = HttpResponse(markdown, content_type='text/markdown')
+        response['Content-Disposition'] = f'attachment; filename=\"scan-{scan.id}.md\"'
+        return response

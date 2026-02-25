@@ -263,3 +263,28 @@
 ### Next task
 - Section 9: implement export endpoints (JSON + Markdown) and wire frontend download actions.
 
+## 2026-02-26 — Section 9 Export completed
+- Added export generator module `apps/scans/exporters.py`.
+- Implemented scan export endpoints:
+  - `GET /api/scans/:id/export.json/`
+  - `GET /api/scans/:id/export.md/`
+- Added scan-page UI download actions with authenticated fetch and blob download:
+  - Export JSON
+  - Export Markdown
+- Added test coverage for both export endpoints.
+
+### Files changed
+- `backend/apps/scans/exporters.py`
+- `backend/apps/scans/views.py`
+- `backend/apps/scans/tests.py`
+- `frontend/src/lib/api.ts`
+- `frontend/src/app/(app)/scans/[id]/page.tsx`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+- `npm run lint && npm run build` (frontend)
+
+### Next task
+- Section 10: hardening (scan rate limits, timeout controls, retention enforcement cleanup, and basic audit events).
+

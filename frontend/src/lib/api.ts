@@ -141,4 +141,26 @@ export async function getFinding(findingId: number): Promise<Finding> {
   return apiRequest<Finding>(`/api/findings/${findingId}/`);
 }
 
+export async function exportScanJson(scanId: string): Promise<Blob> {
+  const token = getAccessToken();
+  const response = await fetch(`${API_BASE_URL}/api/scans/${scanId}/export.json/`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new ApiError("Unable to export JSON report.", response.status);
+  }
+  return response.blob();
+}
+
+export async function exportScanMarkdown(scanId: string): Promise<Blob> {
+  const token = getAccessToken();
+  const response = await fetch(`${API_BASE_URL}/api/scans/${scanId}/export.md/`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new ApiError("Unable to export Markdown report.", response.status);
+  }
+  return response.blob();
+}
+
 export { ApiError };
