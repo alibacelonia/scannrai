@@ -19,13 +19,13 @@
 ---
 
 ## 1) Foundations (backend + infra)
-- [ ] Create Django project + apps: `accounts`, `projects`, `scans`, `findings`
-- [ ] Configure Postgres settings + migrations
-- [ ] Configure DRF + JWT auth (or session auth if preferred)
-- [ ] Add Celery + Redis broker config
-- [ ] Add `.env.example` and local env loading
-- [ ] Add Dockerfiles for backend + worker
-- [ ] Add `docker-compose.yml` (postgres, redis, backend, worker)
+- [x] Create Django project + apps: `accounts`, `projects`, `scans`, `findings`
+- [x] Configure Postgres settings + migrations
+- [x] Configure DRF + JWT auth (or session auth if preferred)
+- [x] Add Celery + Redis broker config
+- [x] Add `.env.example` and local env loading
+- [x] Add Dockerfiles for backend + worker
+- [x] Add `docker-compose.yml` (postgres, redis, backend, worker)
 
 **Definition of done:** `docker compose up` → backend runs, migrations apply, health endpoint returns 200.
 
