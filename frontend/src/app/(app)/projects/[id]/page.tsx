@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 
+import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, createScan, getProject, listProjectScans } from "@/lib/api";
 import type { Project, Scan } from "@/types/api";
 
@@ -76,65 +78,110 @@ export default function ProjectPage() {
   };
 
   if (loading) {
-    return <p className="text-sm text-[var(--ink-muted)]">Loading project...</p>;
+    return <ProjectSkeleton />;
   }
 
   if (!project) {
-    return <p className="text-sm text-[var(--danger)]">Project not found.</p>;
+    return (
+      <PageShell eyebrow="Repository" title="Project not found" description="The repository could not be loaded.">
+        <Card className="rounded-2xl">
+          <CardContent className="pt-5">
+            <p className="text-xs font-medium text-red-700">Project not found.</p>
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
   }
 
   return (
-    <div className="space-y-5">
-      <Card>
-        <CardHeader>
-          <CardTitle>{project.name}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-[var(--ink-muted)]">Repository source: {project.repo_url || "No source configured"}</p>
-          <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={runScan}>
-            <p className="self-center text-xs text-[var(--ink-muted)]">Scan runs in background via worker queue (Celery + Redis).</p>
-            <Button disabled={running} type="submit">
-              {running ? "Queueing..." : "Run scan"}
-            </Button>
-          </form>
-          <p className="text-xs text-[var(--ink-muted)]">Use a local git repository path, local zip path, or remote git URL as the project source.</p>
-          {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
-        </CardContent>
-      </Card>
+    <PageShell eyebrow="Repository" title={project.name} description="Trigger background scans and review repository scan history.">
+      <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Repository Source</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Configured Source</p>
+              <p className="mt-1 break-all text-xs text-slate-800">{project.repo_url || "No source configured"}</p>
+            </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Scans</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {scans.length === 0 ? <p className="text-sm text-[var(--ink-muted)]">No scans yet.</p> : null}
-          {scans.map((scan) => (
-            <Link
-              className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3 hover:bg-[var(--muted)]"
-              href={`/scans/${scan.id}`}
-              key={scan.id}
-            >
-              <div>
-                <p className="font-medium">Scan #{scan.id}</p>
-                <p className="text-xs text-[var(--ink-muted)]">{formatUtcTimestamp(scan.created_at)}</p>
-              </div>
-              <Badge
-                variant={
-                  scan.status === "completed"
-                    ? "success"
-                    : scan.status === "failed"
-                      ? "danger"
-                      : scan.status === "running"
-                        ? "warning"
-                        : "default"
-                }
+            <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={runScan}>
+              <p className="self-center text-xs text-slate-600">
+                Scan runs in background via worker queue (Celery + Redis).
+              </p>
+              <Button disabled={running} type="submit">
+                {running ? "Queueing..." : "Run scan"}
+              </Button>
+            </form>
+
+            <p className="text-xs text-slate-500">
+              Source accepts a local git repository folder, local `.zip`, or remote git URL.
+            </p>
+            {error ? <p className="text-xs font-medium text-red-700">{error}</p> : null}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Scans</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {scans.length === 0 ? <p className="text-xs text-slate-500">No scans yet.</p> : null}
+            {scans.map((scan) => (
+              <Link
+                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 p-3 hover:bg-slate-100"
+                href={`/scans/${scan.id}`}
+                key={scan.id}
               >
-                {scan.status}
-              </Badge>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">Scan #{scan.id}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{formatUtcTimestamp(scan.created_at)}</p>
+                </div>
+                <Badge
+                  variant={
+                    scan.status === "completed"
+                      ? "success"
+                      : scan.status === "failed"
+                        ? "danger"
+                        : scan.status === "running"
+                          ? "warning"
+                          : "default"
+                  }
+                >
+                  {scan.status}
+                </Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </section>
+    </PageShell>
+  );
+}
+
+function ProjectSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-7 w-52" />
+        <Skeleton className="mt-2 h-4 w-72 max-w-full" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-3 w-64 max-w-full" />
+        </div>
+        <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </div>
     </div>
   );
 }

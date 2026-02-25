@@ -13,6 +13,7 @@ This folder tracks build/runtime incidents with:
 - [2026-02-25 local source was uploaded and scan ran synchronously](./2026-02-25-local-source-uploaded-instead-of-path-and-sync-scan.md)
 - [2026-02-25 queued scan task failed quickly due invalid local source path](./2026-02-25-scan-task-fast-failed-invalid-local-source-path.md)
 - [2026-02-25 local source path unreachable (`/host/home/portfolio.sh`)](./2026-02-25-local-source-path-unreachable-portfolio-sh.md)
+- [2026-02-25 local git scan failed on dangling symlinks](./2026-02-25-local-git-scan-failed-on-dangling-symlinks.md)
 - [2026-02-25 folder picker warning showed stale example path](./2026-02-25-folder-picker-stale-example-path.md)
 - [2026-02-25 folder picker without absolute path blocked local open](./2026-02-25-folder-picker-no-absolute-path-cannot-open.md)
 - [2026-02-26 scanner build failure on ARM64 (OSV asset 404)](./2026-02-26-scanner-build-arm64-osv-404.md)

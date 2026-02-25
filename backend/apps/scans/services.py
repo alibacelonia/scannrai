@@ -239,7 +239,14 @@ def _ingest_from_local_git_directory(scan: Scan, source_dir: Path) -> tuple[str 
         raise ValueError('Local directory source must be a git repository (missing .git).')
 
     workspace_dir, repo_dir = _ensure_workspace(scan.id)
-    shutil.copytree(source_dir, repo_dir, dirs_exist_ok=True, ignore=shutil.ignore_patterns('.git'))
+    # Preserve symlinks as symlinks so broken/generated links do not fail ingestion.
+    shutil.copytree(
+        source_dir,
+        repo_dir,
+        dirs_exist_ok=True,
+        symlinks=True,
+        ignore=shutil.ignore_patterns('.git'),
+    )
 
     commit_result = subprocess.run(
         ['git', '-C', str(source_dir), 'rev-parse', 'HEAD'],

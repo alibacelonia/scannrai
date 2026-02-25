@@ -3,12 +3,14 @@
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageShell } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, exportScanJson, exportScanMarkdown, getFinding, getScan, listScanFindings } from "@/lib/api";
@@ -165,159 +167,159 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-3">
-              <span>Scan #{scan.id}</span>
-              <Badge
-                variant={
-                  scan.status === "completed"
-                    ? "success"
-                    : scan.status === "failed"
-                      ? "danger"
-                      : scan.status === "running"
-                        ? "warning"
-                        : "default"
-                }
-              >
-                {scan.status}
-              </Badge>
-            </CardTitle>
-            <div className="flex gap-2">
-              <Button onClick={downloadJson} size="sm" variant="outline">
-                Export JSON
-              </Button>
-              <Button onClick={downloadMarkdown} size="sm" variant="outline">
-                Export Markdown
-              </Button>
+    <PageShell
+      eyebrow="Scan Session"
+      title={`Scan #${scan.id}`}
+      description="Monitor scan execution and inspect normalized findings."
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge status={scan.status} />
+          <Button onClick={downloadJson} size="sm" variant="outline">
+            Export JSON
+          </Button>
+          <Button onClick={downloadMarkdown} size="sm" variant="outline">
+            Export MD
+          </Button>
+        </div>
+      }
+    >
+      <section className="space-y-4">
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Run Progress</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-slate-900 transition-all" style={{ width: `${progress}%` }} />
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--muted)]">
-            <div
-              className="h-full rounded-full bg-[var(--brand-600)] transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="grid gap-3 md:grid-cols-5">
-            <Metric label="Critical" value={summary.critical} />
-            <Metric label="High" value={summary.high} />
-            <Metric label="Medium" value={summary.medium} />
-            <Metric label="Low" value={summary.low} />
-            <Metric label="Info" value={summary.info} />
-          </div>
-        </CardContent>
-      </Card>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <Metric label="Critical" value={summary.critical} />
+              <Metric label="High" value={summary.high} />
+              <Metric label="Medium" value={summary.medium} />
+              <Metric label="Low" value={summary.low} />
+              <Metric label="Info" value={summary.info} />
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Findings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-4">
-            <Select onValueChange={(value) => setSeverity(value === "all" ? "" : (value as Severity))} value={severity || "all"}>
-              <SelectTrigger>
-                <SelectValue placeholder="All severities" />
-              </SelectTrigger>
-              <SelectContent>
-                {severityOptions.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value === "all" ? "All severities" : value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select onValueChange={(value) => setTool(value === "all" ? "" : (value as Tool))} value={tool || "all"}>
-              <SelectTrigger>
-                <SelectValue placeholder="All tools" />
-              </SelectTrigger>
-              <SelectContent>
-                {toolOptions.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value === "all" ? "All tools" : value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input onChange={(event) => setCategory(event.target.value)} placeholder="Category" value={category} />
-            <Input onChange={(event) => setFileQuery(event.target.value)} placeholder="File path" value={fileQuery} />
-          </div>
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle>Findings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Severity</p>
+                <Select onValueChange={(value) => setSeverity(value === "all" ? "" : (value as Severity))} value={severity || "all"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All severities" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {severityOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value === "all" ? "All severities" : value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Severity</TableHead>
-                <TableHead>Tool</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>File</TableHead>
-                <TableHead>Lines</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {findings.length === 0 ? (
-                scan.status === "running" || scan.status === "queued" ? (
-                  <FindingSkeletonRows />
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Tool</p>
+                <Select onValueChange={(value) => setTool(value === "all" ? "" : (value as Tool))} value={tool || "all"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All tools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {toolOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value === "all" ? "All tools" : value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Category</p>
+                <Input onChange={(event) => setCategory(event.target.value)} placeholder="Filter category" value={category} />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">File Path</p>
+                <Input onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter file" value={fileQuery} />
+              </div>
+            </div>
+
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Severity</TableHead>
+                  <TableHead>Tool</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>File</TableHead>
+                  <TableHead>Lines</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {findings.length === 0 ? (
+                  scan.status === "running" || scan.status === "queued" ? (
+                    <FindingSkeletonRows />
+                  ) : (
+                    <TableRow>
+                      <TableCell className="text-slate-500" colSpan={5}>
+                        No findings for this filter.
+                      </TableCell>
+                    </TableRow>
+                  )
                 ) : (
-                  <TableRow>
-                    <TableCell className="text-[var(--ink-muted)]" colSpan={5}>
-                      No findings for this filter.
-                    </TableCell>
-                  </TableRow>
-                )
-              ) : (
-                findings.map((finding) => (
-                  <TableRow
-                    className="cursor-pointer"
-                    key={finding.id}
-                    onClick={() => {
-                      void openFinding(finding.id);
-                    }}
-                  >
-                    <TableCell>
-                      <Badge variant={finding.severity}>{finding.severity}</Badge>
-                    </TableCell>
-                    <TableCell>{finding.tool}</TableCell>
-                    <TableCell>{finding.category}</TableCell>
-                    <TableCell>{finding.file_path || "-"}</TableCell>
-                    <TableCell>
-                      {finding.line_start ? `${finding.line_start}${finding.line_end ? `-${finding.line_end}` : ""}` : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  findings.map((finding) => (
+                    <TableRow
+                      className="cursor-pointer"
+                      key={finding.id}
+                      onClick={() => {
+                        void openFinding(finding.id);
+                      }}
+                    >
+                      <TableCell>
+                        <Badge variant={finding.severity}>{finding.severity}</Badge>
+                      </TableCell>
+                      <TableCell>{finding.tool}</TableCell>
+                      <TableCell>{finding.category}</TableCell>
+                      <TableCell>{finding.file_path || "-"}</TableCell>
+                      <TableCell>
+                        {finding.line_start ? `${finding.line_start}${finding.line_end ? `-${finding.line_end}` : ""}` : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </section>
 
       <Dialog open={Boolean(selectedFinding)} onOpenChange={(open) => !open && setSelectedFinding(null)}>
         {selectedFinding ? (
-          <DialogContent className="flex h-[90vh] max-w-2xl flex-col overflow-hidden p-0">
-            <DialogHeader className="border-b border-[var(--border)] px-5 py-4">
-              <DialogTitle>Finding #{selectedFinding.id}</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="flex h-[90vh] max-w-3xl flex-col overflow-hidden p-0">
+            <DialogHeader className="border-b border-slate-200 px-5 py-4">
+              <DialogTitle className="text-base">Finding #{selectedFinding.id}</DialogTitle>
+              <DialogDescription className="text-xs">
                 Review the highlighted snippet or raw scanner payload.
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-hidden p-4">
-              <Tabs
-                className="flex h-full flex-col"
-                value={detailTab}
-                onValueChange={(value) => setDetailTab(value as "snippet" | "raw")}
-              >
+              <Tabs className="flex h-full flex-col" onValueChange={(value) => setDetailTab(value as "snippet" | "raw")} value={detailTab}>
                 <TabsList>
                   <TabsTrigger value="snippet">Code Snippet</TabsTrigger>
                   <TabsTrigger value="raw">Raw JSON</TabsTrigger>
                 </TabsList>
                 <TabsContent className="h-full overflow-auto" value="snippet">
                   {selectedFinding.snippet?.lines?.length ? (
-                    <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#0f172a] text-xs text-slate-100">
+                    <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950 text-xs text-slate-100">
                       {selectedFinding.snippet.lines.map((line) => (
                         <div
-                          className={`grid grid-cols-[56px_1fr] px-3 py-1 ${line.highlighted ? "bg-[#1e293b]" : ""}`}
+                          className={`grid grid-cols-[56px_1fr] px-3 py-1 ${line.highlighted ? "bg-slate-800" : ""}`}
                           key={line.line_number}
                         >
                           <span className="text-slate-400">{line.line_number}</span>
@@ -326,11 +328,11 @@ export default function ScanPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-[var(--ink-muted)]">No snippet available for this finding.</p>
+                    <p className="text-xs text-slate-500">No snippet available for this finding.</p>
                   )}
                 </TabsContent>
                 <TabsContent className="h-full overflow-auto" value="raw">
-                  <pre className="overflow-auto rounded-xl bg-[var(--ink)] p-4 text-xs text-white">
+                  <pre className="overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-white">
                     {JSON.stringify(selectedFinding.raw, null, 2)}
                   </pre>
                 </TabsContent>
@@ -340,25 +342,71 @@ export default function ScanPage() {
         ) : null}
       </Dialog>
 
-      {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
-    </div>
+      {error ? <p className="text-xs font-medium text-red-700">{error}</p> : null}
+    </PageShell>
+  );
+}
+
+function StatusBadge({ status }: { status: Scan["status"] }) {
+  return (
+    <Badge
+      variant={
+        status === "completed"
+          ? "success"
+          : status === "failed"
+            ? "danger"
+            : status === "running"
+              ? "warning"
+              : "default"
+      }
+    >
+      {status}
+    </Badge>
   );
 }
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-3">
-      <p className="text-xs uppercase tracking-[0.12em] text-[var(--ink-muted)]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
 }
 
 function ScanSkeleton() {
   return (
-    <div className="space-y-5 animate-pulse">
-      <div className="h-40 rounded-2xl border border-[var(--border)] bg-[var(--muted)]" />
-      <div className="h-96 rounded-2xl border border-[var(--border)] bg-[var(--muted)]" />
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-3 h-7 w-40" />
+        <Skeleton className="mt-2 h-4 w-72 max-w-full" />
+      </div>
+      <div className="space-y-4">
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-2 w-full rounded-full" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, idx) => (
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3" key={`metric-${idx}`}>
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-6 w-10" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
+          <Skeleton className="h-3 w-20" />
+          <div className="grid gap-3 md:grid-cols-4">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -369,7 +417,7 @@ function FindingSkeletonRows() {
       {Array.from({ length: 3 }).map((_, idx) => (
         <TableRow key={`skeleton-${idx}`}>
           <TableCell colSpan={5}>
-            <div className="h-4 w-full animate-pulse rounded bg-[var(--muted)]" />
+            <Skeleton className="h-4 w-full" />
           </TableCell>
         </TableRow>
       ))}

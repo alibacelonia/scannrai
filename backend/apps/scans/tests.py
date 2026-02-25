@@ -152,6 +152,39 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(refreshed.data['meta']['source'], 'local_zip')
                 self.assertEqual(refreshed.data['meta']['local_path'], str(zip_path))
 
+    def test_local_git_repo_with_dangling_symlink_completes_scan(self):
+        with tempfile.TemporaryDirectory() as source_repo_dir, tempfile.TemporaryDirectory() as workspace:
+            self._init_git_repo(source_repo_dir)
+            dangling_link = Path(source_repo_dir) / 'mobile' / 'ios' / '.symlinks' / 'plugins' / 'integration_test'
+            dangling_link.parent.mkdir(parents=True, exist_ok=True)
+
+            try:
+                dangling_link.symlink_to('/definitely/missing/target')
+            except (NotImplementedError, OSError):
+                self.skipTest('Symlink creation not supported in this test environment.')
+
+            self.project.repo_url = source_repo_dir
+            self.project.save(update_fields=['repo_url'])
+
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                with patch('apps.projects.views.scan_repo.delay', return_value=SimpleNamespace(id='task-dangling')):
+                    response = self.client.post(
+                        f'/api/projects/{self.project.id}/scans/',
+                        {'meta': {'source_hint': 'local-git'}},
+                        format='json',
+                    )
+
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                scan_id = response.data['id']
+
+                scan_repo(scan_id)
+
+                refreshed = self.client.get(f'/api/scans/{scan_id}/')
+                self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
+                self.assertEqual(refreshed.data['status'], 'completed')
+                self.assertEqual(refreshed.data['meta']['source'], 'local_git')
+                self.assertNotIn('ingestion_error', refreshed.data['meta'])
+
     def test_upload_payload_rejected(self):
         upload = SimpleUploadedFile('repo.zip', b'PK\x03\x04', content_type='application/zip')
         response = self.client.post(

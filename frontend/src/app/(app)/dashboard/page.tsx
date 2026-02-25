@@ -6,8 +6,10 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useSta
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ApiError,
   createProject,
@@ -271,25 +273,37 @@ export default function DashboardPage() {
       .finally(() => setLocalValidating(false));
   };
 
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
+    <PageShell
+      eyebrow="Workspace"
+      title="Repository Dashboard"
+      description="Open a remote repository or resolve a local source path for background scans."
+    >
+      <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle>Open repository</CardTitle>
+            <CardTitle>Open Repository</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={openRemoteRepository}>
-              <Input
-                onChange={(event) => setRemoteRepoUrl(event.target.value)}
-                placeholder="Remote repository URL (https://github.com/org/repo)"
-                value={remoteRepoUrl}
-              />
-              <Button disabled={remoteOpening || !remoteRepoUrl.trim()} type="submit">
+            <form className="grid gap-2 md:grid-cols-[1fr_auto]" onSubmit={openRemoteRepository}>
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Remote URL</label>
+                <Input
+                  onChange={(event) => setRemoteRepoUrl(event.target.value)}
+                  placeholder="https://github.com/org/repo"
+                  value={remoteRepoUrl}
+                />
+              </div>
+              <Button className="self-end" disabled={remoteOpening || !remoteRepoUrl.trim()} type="submit">
                 {remoteOpening ? "Opening..." : "Open remote"}
               </Button>
             </form>
-            <form className="grid gap-3 md:grid-cols-[1fr_auto_auto]" onSubmit={openLocalRepository}>
+
+            <form className="grid gap-2 md:grid-cols-[1fr_auto_auto]" onSubmit={openLocalRepository}>
               <input
                 className="hidden"
                 ref={localFolderPickerRef}
@@ -299,27 +313,33 @@ export default function DashboardPage() {
                 directory=""
                 onChange={handleLocalFolderSelection}
               />
-              <Input
-                onChange={(event) => setLocalSourcePath(event.target.value)}
-                placeholder={selectedLocalFolder ? localPathHint : "Local source path (/host/home/.../my-repo or /host/home/.../repo.zip)"}
-                value={localSourcePath}
-              />
-              <Button onClick={chooseLocalRepositoryFolder} type="button" variant="outline">
-                Select repo folder
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Local source path</label>
+                <Input
+                  onChange={(event) => setLocalSourcePath(event.target.value)}
+                  placeholder={selectedLocalFolder ? localPathHint : "/host/home/.../repo or /host/home/.../repo.zip"}
+                  value={localSourcePath}
+                />
+              </div>
+              <Button className="self-end" onClick={chooseLocalRepositoryFolder} type="button" variant="outline">
+                Select folder
               </Button>
-              <Button disabled={localOpening || localValidating || !localSourcePath.trim()} type="submit">
-                {localValidating ? "Validating..." : localOpening ? "Opening..." : "Open local source"}
+              <Button className="self-end" disabled={localOpening || localValidating || !localSourcePath.trim()} type="submit">
+                {localValidating ? "Validating..." : localOpening ? "Opening..." : "Open local"}
               </Button>
             </form>
-            <p className="text-xs text-[var(--ink-muted)]">
-              Local source is path-based (no upload). Use a git repository folder path or a local .zip path accessible to backend/worker.
+
+            <p className="text-xs text-slate-500">
+              Local source is path-based. Use a git repository folder path or local .zip path accessible to backend/worker.
             </p>
             {selectedLocalFolder ? (
-              <p className="text-xs text-[var(--ink-muted)]">Selected folder: <span className="font-medium text-[var(--ink)]">{selectedLocalFolder}</span></p>
+              <p className="text-xs text-slate-500">
+                Selected folder: <span className="font-semibold text-slate-900">{selectedLocalFolder}</span>
+              </p>
             ) : null}
             {localSourceCandidates.length > 1 ? (
               <div className="space-y-2">
-                <p className="text-xs text-[var(--ink-muted)]">Discovered source paths</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Discovered paths</p>
                 <div className="space-y-2">
                   {localSourceCandidates.map((candidate) => (
                     <Button
@@ -338,59 +358,64 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : null}
-            {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
+            {error ? <p className="text-xs font-medium text-red-700">{error}</p> : null}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Snapshot</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-[var(--ink-muted)]">
-            <p>Repositories: <span className="font-semibold text-[var(--ink)]">{projects.length}</span></p>
-            <p>Recent scans: <span className="font-semibold text-[var(--ink)]">{recentScans.length}</span></p>
+          <CardContent className="space-y-3 text-xs text-slate-600">
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Repositories</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">{projects.length}</p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Recent scans</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">{recentScans.length}</p>
+            </div>
           </CardContent>
         </Card>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Repositories</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? <p className="text-sm text-[var(--ink-muted)]">Loading repositories...</p> : null}
-            {!loading && projects.length === 0 ? <p className="text-sm text-[var(--ink-muted)]">No repositories yet.</p> : null}
-            <div className="space-y-3">
+            {projects.length === 0 ? <p className="text-xs text-slate-500">No repositories yet.</p> : null}
+            <div className="space-y-2">
               {projects.map((project) => (
                 <Link
-                  className="block rounded-xl border border-[var(--border)] p-3 hover:bg-[var(--muted)]"
+                  className="block rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100"
                   href={`/projects/${project.id}`}
                   key={project.id}
                 >
-                  <p className="font-medium">{project.name}</p>
-                  <p className="text-xs text-[var(--ink-muted)]">{project.repo_url || "No repository source configured"}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">{project.name}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{project.repo_url || "No repository source configured"}</p>
                 </Link>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle>Recent scans</CardTitle>
+            <CardTitle>Recent Scans</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {recentScans.length === 0 ? <p className="text-sm text-[var(--ink-muted)]">No scans yet.</p> : null}
+          <CardContent className="space-y-2">
+            {recentScans.length === 0 ? <p className="text-xs text-slate-500">No scans yet.</p> : null}
             {recentScans.map((scan) => (
               <Link
-                className="flex items-center justify-between rounded-xl border border-[var(--border)] p-3 hover:bg-[var(--muted)]"
+                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100"
                 href={`/scans/${scan.id}`}
                 key={scan.id}
               >
                 <div>
-                  <p className="font-medium">Scan #{scan.id}</p>
-                  <p className="text-xs text-[var(--ink-muted)]">Project #{scan.project}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">Scan #{scan.id}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">Project #{scan.project}</p>
                 </div>
                 <Badge
                   variant={
@@ -410,6 +435,43 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+    </PageShell>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="mt-3 h-7 w-56" />
+        <Skeleton className="mt-2 h-4 w-80 max-w-full" />
+      </div>
+      <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-3 w-64" />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </div>
     </div>
   );
 }
