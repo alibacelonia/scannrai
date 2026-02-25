@@ -1,3 +1,9 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Project
+
+
+@admin.register(Project)
+class ProjectAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_by', 'repo_url', 'created_at')
+    search_fields = ('name', 'repo_url', 'created_by__username', 'created_by__email')

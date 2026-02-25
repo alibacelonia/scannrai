@@ -32,17 +32,17 @@
 ---
 
 ## 2) Core data models + API
-- [ ] Models:
-  - [ ] `Project` (name, repo_url nullable, created_by)
-  - [ ] `Scan` (project, status, commit_hash, started_at, finished_at, meta JSON)
-  - [ ] `Finding` (scan, tool, severity, category, file_path, lines, raw JSON, fingerprint)
-- [ ] Serializers + ViewSets
-- [ ] API routes:
-  - [ ] CRUD Projects
-  - [ ] Create Scan for Project
-  - [ ] Scan status endpoint
-  - [ ] Findings list with pagination + filters (severity/tool/category/file)
-  - [ ] Finding detail endpoint
+- [x] Models:
+  - [x] `Project` (name, repo_url nullable, created_by)
+  - [x] `Scan` (project, status, commit_hash, started_at, finished_at, meta JSON)
+  - [x] `Finding` (scan, tool, severity, category, file_path, lines, raw JSON, fingerprint)
+- [x] Serializers + ViewSets
+- [x] API routes:
+  - [x] CRUD Projects
+  - [x] Create Scan for Project
+  - [x] Scan status endpoint
+  - [x] Findings list with pagination + filters (severity/tool/category/file)
+  - [x] Finding detail endpoint
 
 **Definition of done:** Can create a project and start a scan record (no scanners yet), view scan status, list findings (empty).
 
