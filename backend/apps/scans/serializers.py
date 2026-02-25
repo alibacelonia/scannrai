@@ -1,3 +1,5 @@
+import json
+
 from django.db.models import Count
 from rest_framework import serializers
 
@@ -34,7 +36,24 @@ class ScanSerializer(serializers.ModelSerializer):
 
 
 class ScanCreateSerializer(serializers.ModelSerializer):
+    meta = serializers.JSONField(required=False, default=dict)
+
     class Meta:
         model = Scan
         fields = ('id', 'commit_hash', 'meta')
         read_only_fields = ('id',)
+
+    def validate_meta(self, value):
+        if value in (None, ''):
+            return {}
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise serializers.ValidationError('meta must be valid JSON.') from exc
+            if not isinstance(parsed, dict):
+                raise serializers.ValidationError('meta must be a JSON object.')
+            return parsed
+        if not isinstance(value, dict):
+            raise serializers.ValidationError('meta must be a JSON object.')
+        return value

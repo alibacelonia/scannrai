@@ -1,4 +1,12 @@
+import io
+import tempfile
+import zipfile
+from pathlib import Path
+
+from dulwich import porcelain
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -16,45 +24,104 @@ class ScanApiTests(APITestCase):
         self.client.force_authenticate(self.user)
         self.project = Project.objects.create(name='Scan Target', created_by=self.user)
 
-    def test_create_scan_and_filter_findings(self):
-        create_scan_response = self.client.post(
-            f'/api/projects/{self.project.id}/scans/',
-            {
-                'commit_hash': 'abc123',
-                'meta': {'source': 'test'},
-            },
-            format='json',
-        )
-        self.assertEqual(create_scan_response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(create_scan_response.data['status'], 'queued')
+    def _build_zip_upload(self, filename: str = 'repo.zip') -> SimpleUploadedFile:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('src/app.py', 'print("hello")\n')
+            archive.writestr('requirements.txt', 'django==5.1.6\n')
+        buffer.seek(0)
+        return SimpleUploadedFile(filename, buffer.read(), content_type='application/zip')
 
-        scan_id = create_scan_response.data['id']
+    def test_create_scan_from_zip_and_filter_findings(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                create_scan_response = self.client.post(
+                    f'/api/projects/{self.project.id}/scans/',
+                    {
+                        'meta': '{"source_hint":"upload"}',
+                        'zip_file': self._build_zip_upload(),
+                    },
+                    format='multipart',
+                )
 
-        scan_status_response = self.client.get(f'/api/scans/{scan_id}/')
-        self.assertEqual(scan_status_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(scan_status_response.data['summary']['critical'], 0)
+                self.assertEqual(create_scan_response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(create_scan_response.data['status'], 'completed')
+                self.assertEqual(create_scan_response.data['meta']['source'], 'zip')
+                self.assertIn('snapshot_checksum', create_scan_response.data['meta'])
 
-        empty_findings_response = self.client.get(f'/api/scans/{scan_id}/findings/?severity=high')
-        self.assertEqual(empty_findings_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(empty_findings_response.data['count'], 0)
+                workspace_path = Path(create_scan_response.data['meta']['workspace_dir'])
+                self.assertTrue(workspace_path.exists())
 
-        finding = Finding.objects.create(
-            scan_id=scan_id,
-            tool=FindingTool.SEMGREP,
-            severity=FindingSeverity.HIGH,
-            category='Injection',
-            file_path='src/app.py',
-            line_start=10,
-            line_end=12,
-            raw={'rule': 'test-rule'},
-            fingerprint='abc-fingerprint',
-        )
+                scan_id = create_scan_response.data['id']
 
-        filtered_findings_response = self.client.get(f'/api/scans/{scan_id}/findings/?severity=high&file=app.py')
-        self.assertEqual(filtered_findings_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(filtered_findings_response.data['count'], 1)
-        self.assertEqual(filtered_findings_response.data['results'][0]['id'], finding.id)
+                scan_status_response = self.client.get(f'/api/scans/{scan_id}/')
+                self.assertEqual(scan_status_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(scan_status_response.data['summary']['critical'], 0)
 
-        finding_detail_response = self.client.get(f'/api/findings/{finding.id}/')
-        self.assertEqual(finding_detail_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(finding_detail_response.data['fingerprint'], 'abc-fingerprint')
+                empty_findings_response = self.client.get(f'/api/scans/{scan_id}/findings/?severity=high')
+                self.assertEqual(empty_findings_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(empty_findings_response.data['count'], 0)
+
+                finding = Finding.objects.create(
+                    scan_id=scan_id,
+                    tool=FindingTool.SEMGREP,
+                    severity=FindingSeverity.HIGH,
+                    category='Injection',
+                    file_path='src/app.py',
+                    line_start=10,
+                    line_end=12,
+                    raw={'rule': 'test-rule'},
+                    fingerprint='abc-fingerprint',
+                )
+
+                filtered_findings_response = self.client.get(f'/api/scans/{scan_id}/findings/?severity=high&file=app.py')
+                self.assertEqual(filtered_findings_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(filtered_findings_response.data['count'], 1)
+                self.assertEqual(filtered_findings_response.data['results'][0]['id'], finding.id)
+
+                finding_detail_response = self.client.get(f'/api/findings/{finding.id}/')
+                self.assertEqual(finding_detail_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(finding_detail_response.data['fingerprint'], 'abc-fingerprint')
+
+    def test_missing_repo_source_marks_scan_failed(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                response = self.client.post(
+                    f'/api/projects/{self.project.id}/scans/',
+                    {'meta': {'trigger': 'no-source'}},
+                    format='json',
+                )
+
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(response.data['status'], 'failed')
+                self.assertIn('ingestion_error', response.data['meta'])
+
+    def test_create_scan_from_git_repo_url_records_commit_hash(self):
+        with tempfile.TemporaryDirectory() as source_repo_dir, tempfile.TemporaryDirectory() as workspace:
+            porcelain.init(source_repo_dir)
+            Path(source_repo_dir, 'main.py').write_text('print(\"scan\")\\n')
+            porcelain.add(repo=source_repo_dir, paths=['main.py'])
+            commit_id = porcelain.commit(
+                repo=source_repo_dir,
+                message=b'Initial commit',
+                author=b'Test <test@example.com>',
+                committer=b'Test <test@example.com>',
+            ).decode('utf-8')
+
+            project = Project.objects.create(
+                name='Git Source Project',
+                created_by=self.user,
+                repo_url=source_repo_dir,
+            )
+
+            with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                response = self.client.post(
+                    f'/api/projects/{project.id}/scans/',
+                    {'meta': {'source_hint': 'git'}},
+                    format='json',
+                )
+
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            self.assertEqual(response.data['status'], 'completed')
+            self.assertEqual(response.data['commit_hash'], commit_id)
+            self.assertEqual(response.data['meta']['source'], 'git')

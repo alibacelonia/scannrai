@@ -60,3 +60,38 @@
 ### Next task
 - Section 3: implement repo snapshot ingestion (git clone + zip extraction) and persist scan metadata.
 
+## 2026-02-26 — Section 3 Repo ingestion completed
+- Added scan ingestion service in `apps/scans/services.py`:
+  - Git clone to `/tmp/scannrai/<scan_id>/repo` (attempt shallow clone, fallback to full clone when needed)
+  - ZIP upload extraction with safe path validation
+  - Snapshot checksum computation for ZIP sources
+- Updated scan creation flow to execute ingestion and persist metadata:
+  - `commit_hash` for git scans
+  - `snapshot_checksum` for zip scans
+  - `source`, `repo_dir`, and `workspace_dir` in scan metadata
+- Added configurable cleanup routine after scan completion:
+  - `SCAN_WORKDIR`
+  - `SCAN_RETENTION_SECONDS`
+- Added `scan_repo` Celery task scaffolding for ingestion execution path.
+- Added test coverage for:
+  - zip ingestion path
+  - git ingestion path
+  - missing source failure path
+
+### Files changed
+- `backend/apps/scans/services.py`
+- `backend/apps/projects/views.py`
+- `backend/apps/scans/tasks.py`
+- `backend/apps/scans/serializers.py`
+- `backend/apps/scans/tests.py`
+- `backend/scannrai/settings.py`
+- `backend/requirements.txt`
+- `.env.example`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.projects.tests apps.scans.tests`
+
+### Next task
+- Section 4: add scanner container and implement Semgrep/OSV/Gitleaks tool runners with timeout-safe subprocess execution and raw output persistence.
+

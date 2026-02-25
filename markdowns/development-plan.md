@@ -49,13 +49,13 @@
 ---
 
 ## 3) Scanner runtime (repo ingestion)
-- [ ] Implement repo snapshot handling:
-  - [ ] Git URL shallow clone to `/tmp/scannrai/<scan_id>/repo`
-  - [ ] ZIP upload extraction to workspace
-- [ ] Store scan metadata:
-  - [ ] `commit_hash` (if git)
-  - [ ] snapshot checksum (if zip)
-- [ ] Cleanup routine after scan completion (configurable retention)
+- [x] Implement repo snapshot handling:
+  - [x] Git URL shallow clone to `/tmp/scannrai/<scan_id>/repo`
+  - [x] ZIP upload extraction to workspace
+- [x] Store scan metadata:
+  - [x] `commit_hash` (if git)
+  - [x] snapshot checksum (if zip)
+- [x] Cleanup routine after scan completion (configurable retention)
 
 **Definition of done:** Starting a scan clones/extracts repo successfully and records metadata.
 

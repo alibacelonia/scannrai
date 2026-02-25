@@ -1,6 +1,44 @@
+from pathlib import Path
+
+from django.utils import timezone
 from celery import shared_task
+
+from .models import Scan, ScanStatus
+from .services import cleanup_scan_workspace, ingest_scan_from_zip_path, ingest_scan_source
 
 
 @shared_task
 def health_task() -> str:
     return 'ok'
+
+
+@shared_task
+def scan_repo(scan_id: int, zip_path: str | None = None) -> str:
+    scan = Scan.objects.select_related('project').get(id=scan_id)
+    scan.status = ScanStatus.RUNNING
+    scan.started_at = timezone.now()
+    scan.save(update_fields=['status', 'started_at', 'updated_at'])
+
+    try:
+        if zip_path:
+            commit_hash, ingestion_meta = ingest_scan_from_zip_path(scan, Path(zip_path))
+        else:
+            commit_hash, ingestion_meta = ingest_scan_source(scan)
+
+        meta = dict(scan.meta or {})
+        meta.update(ingestion_meta)
+        scan.meta = meta
+        if commit_hash:
+            scan.commit_hash = commit_hash
+        scan.status = ScanStatus.COMPLETED
+    except Exception as exc:
+        meta = dict(scan.meta or {})
+        meta['ingestion_error'] = str(exc)
+        scan.meta = meta
+        scan.status = ScanStatus.FAILED
+    finally:
+        scan.finished_at = timezone.now()
+        scan.save(update_fields=['status', 'commit_hash', 'meta', 'finished_at', 'updated_at'])
+        cleanup_scan_workspace(scan.id)
+
+    return scan.status
