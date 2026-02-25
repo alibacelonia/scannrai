@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #fff7ed;
+  --ink: #1f2937;
+  --ink-muted: #6b7280;
+  --brand-100: #dbeafe;
+  --brand-400: #60a5fa;
+  --brand-600: #1d4ed8;
+  --brand-700: #1e40af;
+  --muted: #f1f5f9;
+  --muted-strong: #e2e8f0;
+  --border: #dbe2ea;
+  --danger: #b91c1c;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  color: var(--ink);
+  background: var(--surface);
+  font-family: var(--font-body), "IBM Plex Mono", monospace;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), "Space Grotesk", sans-serif;
+}

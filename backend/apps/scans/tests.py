@@ -61,6 +61,10 @@ class ScanApiTests(APITestCase):
 
                 scan_id = create_scan_response.data['id']
 
+                project_scans_response = self.client.get(f'/api/projects/{self.project.id}/scans/')
+                self.assertEqual(project_scans_response.status_code, status.HTTP_200_OK)
+                self.assertEqual(project_scans_response.data['count'], 1)
+
                 scan_status_response = self.client.get(f'/api/scans/{scan_id}/')
                 self.assertEqual(scan_status_response.status_code, status.HTTP_200_OK)
                 self.assertEqual(scan_status_response.data['summary']['critical'], 0)

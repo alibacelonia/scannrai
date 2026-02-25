@@ -25,9 +25,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-    @action(detail=True, methods=['post'], url_path='scans')
-    def create_scan(self, request, pk=None):
+    @action(detail=True, methods=['get', 'post'], url_path='scans')
+    def scans(self, request, pk=None):
         project = self.get_object()
+
+        if request.method.lower() == 'get':
+            queryset = project.scans.all().order_by('-created_at')
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                return self.get_paginated_response(ScanSerializer(page, many=True).data)
+            return Response(ScanSerializer(queryset, many=True).data)
+
         serializer = ScanCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         scan = Scan.objects.create(

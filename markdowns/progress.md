@@ -153,3 +153,39 @@
 ### Next task
 - Section 6: scaffold Next.js + shadcn frontend and connect dashboard/project/scan pages to backend APIs.
 
+## 2026-02-26 — Section 6 Frontend foundations completed
+- Scaffolded `frontend/` with Next.js App Router + TypeScript + Tailwind.
+- Added shadcn-style setup and UI primitives (`components.json`, `Button`, `Input`, `Card`, `Badge`, `Table`, `cn()` utility).
+- Implemented auth flow pages:
+  - `/login`
+  - `/register`
+- Added protected app shell with sidebar/topbar layout and auth gate:
+  - `/dashboard`
+  - `/projects/[id]`
+  - `/scans/[id]`
+- Added frontend API client + token storage (`src/lib/api.ts`, `src/lib/auth.ts`) targeting backend JWT endpoints.
+- Added backend support endpoints required by frontend:
+  - `POST /api/auth/register/`
+  - `GET /api/me/`
+  - `GET /api/projects/:id/scans/`
+- Added frontend Dockerfile and compose service for local app runtime.
+
+### Files changed
+- `frontend/**`
+- `backend/apps/accounts/*`
+- `backend/apps/projects/views.py`
+- `backend/scannrai/urls.py`
+- `infra/docker/frontend.Dockerfile`
+- `docker-compose.yml`
+- `.env.example`
+- `markdowns/development-plan.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 manage.py test apps.accounts.tests apps.projects.tests apps.scans.tests apps.findings.tests`
+- `npm run lint` (frontend)
+- `npm run build` (frontend)
+- `docker compose config`
+
+### Next task
+- Section 7: findings UX polish (filters, detail drawer enhancements, better status polling/progress, and empty/skeleton states).
+

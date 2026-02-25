@@ -86,13 +86,13 @@
 ---
 
 ## 6) Frontend foundations (Next.js + shadcn)
-- [ ] Setup Next.js app + shadcn + auth pages
-- [ ] Layout: sidebar + topbar + content
-- [ ] API client (fetch wrapper) + auth token storage
-- [ ] Pages:
-  - [ ] Dashboard (projects + recent scans)
-  - [ ] Project page (scan list + Run Scan)
-  - [ ] Scan page (status + findings table)
+- [x] Setup Next.js app + shadcn + auth pages
+- [x] Layout: sidebar + topbar + content
+- [x] API client (fetch wrapper) + auth token storage
+- [x] Pages:
+  - [x] Dashboard (projects + recent scans)
+  - [x] Project page (scan list + Run Scan)
+  - [x] Scan page (status + findings table)
 
 **Definition of done:** User can run scans and see results in a table UI.
 
