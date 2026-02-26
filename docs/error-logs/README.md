@@ -30,3 +30,4 @@ This folder tracks build/runtime incidents with:
 - [2026-02-26 postgres startup failed from Buildx state volume exhaustion](./2026-02-26-postgres-no-space-buildx-state-volume.md)
 - [2026-02-26 invalid remote repository URL accepted until backend restart](./2026-02-26-invalid-remote-url-accepted-until-backend-restart.md)
 - [2026-02-26 login toast showed raw Next.js 404 HTML](./2026-02-26-login-toast-showed-nextjs-404-html.md)
+- [2026-02-26 profile completion redirect stuck on profile with `next_url`](./2026-02-26-profile-next-url-stuck-on-profile-after-completion.md)

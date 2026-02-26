@@ -127,12 +127,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayName = authUser?.profile?.full_name?.trim() || accountName;
 
   useEffect(() => {
-    if (!authUser || authUser.has_completed_profile || pathname.startsWith("/profile")) {
+    if (pathname.startsWith("/profile") || pathname.startsWith("/login") || pathname.startsWith("/register")) {
       return;
     }
-    const nextPath = pathname && pathname !== "/profile" ? pathname : "/dashboard";
-    router.replace(`/profile?next_url=${encodeURIComponent(nextPath)}`);
-  }, [authUser, pathname, router]);
+
+    let mounted = true;
+    void getMe()
+      .then((user) => {
+        if (!mounted) {
+          return;
+        }
+        setAuthUser(user);
+        if (!user.has_completed_profile) {
+          const nextPath = pathname && pathname !== "/profile" ? pathname : "/dashboard";
+          router.replace(`/profile?next_url=${encodeURIComponent(nextPath)}`);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setAuthUser(null);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [pathname, router]);
   const accountInitials = useMemo(() => {
     const source = (authUser?.username || authUser?.email || "AC").trim();
     if (!source) {
