@@ -11,7 +11,64 @@ import type {
   User,
 } from "@/types/api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+function hasScheme(value: string): boolean {
+  return /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
+}
+
+function isLocalHostLike(value: string): boolean {
+  return /^(localhost|127(?:\.\d{1,3}){3})(:\d+)?$/i.test(value);
+}
+
+function normalizeApiBaseUrl(value: string | undefined): string {
+  const fallback = "http://localhost:8000";
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const withoutTrailingSlash = raw.replace(/\/+$/, "");
+  const withScheme = hasScheme(withoutTrailingSlash)
+    ? withoutTrailingSlash
+    : `${isLocalHostLike(withoutTrailingSlash) ? "http" : "https"}://${withoutTrailingSlash}`;
+
+  try {
+    const parsed = new URL(withScheme);
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return new URL(normalizedPath, `${API_BASE_URL}/`).toString();
+}
+
+function summarizeTextBody(text: string, status: number): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/<(!doctype|html)\b/i.test(trimmed)) {
+    if (status === 404) {
+      return "Received HTML 404 instead of API JSON. Verify NEXT_PUBLIC_API_BASE_URL points to the backend origin.";
+    }
+    return "Received unexpected HTML response from API. Verify NEXT_PUBLIC_API_BASE_URL and reverse-proxy routing.";
+  }
+
+  return trimmed.length > 280 ? `${trimmed.slice(0, 280)}...` : trimmed;
+}
+
+function shrinkErrorDetails(body: unknown): unknown {
+  if (typeof body !== "string") {
+    return body;
+  }
+  const maxChars = 1200;
+  return body.length > maxChars ? `${body.slice(0, maxChars)}...` : body;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 let refreshPromise: Promise<string | null> | null = null;
 
 class ApiError extends Error {
@@ -54,7 +111,7 @@ async function apiRequest<T>(
     if (options.auth && token) {
       headers.set("Authorization", `Bearer ${token}`);
     }
-    return fetch(`${API_BASE_URL}${path}`, {
+    return fetch(buildApiUrl(path), {
       ...init,
       headers,
     });
@@ -71,18 +128,25 @@ async function apiRequest<T>(
     }
   } catch (error) {
     throw new ApiError(
-      "Cannot reach API. Check that backend is running and CORS is configured for http://localhost:3000.",
+      `Cannot reach API at ${API_BASE_URL}. Check backend availability, TLS, and CORS configuration.`,
       0,
       error,
     );
   }
 
+  const rawBody = await response.text();
   let body: unknown = null;
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    body = await response.json();
+    if (rawBody) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = rawBody;
+      }
+    }
   } else {
-    body = await response.text();
+    body = rawBody;
   }
 
   if (!response.ok) {
@@ -93,9 +157,10 @@ async function apiRequest<T>(
       typeof body === "object" && body !== null && "detail" in body
         ? String((body as { detail?: string }).detail)
         : null;
+    const messageFromText = typeof body === "string" ? summarizeTextBody(body, response.status) : null;
     const message =
-      messageFromDetail || firstErrorMessage(body) || response.statusText || "Request failed";
-    throw new ApiError(message, response.status, body);
+      messageFromDetail || messageFromText || firstErrorMessage(body) || response.statusText || "Request failed";
+    throw new ApiError(message, response.status, shrinkErrorDetails(body));
   }
 
   return body as T;
@@ -114,7 +179,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
   refreshPromise = (async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+      const response = await fetch(buildApiUrl("/api/auth/token/refresh/"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh: refreshToken }),

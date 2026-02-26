@@ -18,9 +18,14 @@ services:
     volumes:
       - scan_uploads:/app/.scan-uploads
     depends_on:
-      - postgres
-      - redis
-      - backend
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      scanner:
+        condition: service_started
 
   scanner:
     restart: unless-stopped
