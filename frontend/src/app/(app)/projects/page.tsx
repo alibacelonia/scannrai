@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderGit2, TimerReset, Waves } from "lucide-react";
+import { FolderGit2, Loader2, PlayCircle, TimerReset, Waves } from "lucide-react";
+import { toast } from "sonner";
 
+import { RepositoryOpenActions } from "@/components/repository-open-actions";
 import { PageShell } from "@/components/page-shell";
 import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, listProjects, listProjectScans } from "@/lib/api";
+import { ApiError, createScan, listProjects, listProjectScans } from "@/lib/api";
 import type { Project } from "@/types/api";
 
 type ProjectScanSummary = {
@@ -19,10 +23,12 @@ type ProjectScanSummary = {
 };
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [scanSummary, setScanSummary] = useState<Record<number, ProjectScanSummary>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [startingProjectId, setStartingProjectId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -61,6 +67,22 @@ export default function ProjectsPage() {
     void loadData();
   }, [loadData]);
 
+  const runScanForProject = async (projectId: number) => {
+    setStartingProjectId(projectId);
+    try {
+      const scan = await createScan(String(projectId));
+      router.push(`/scans/${scan.id}`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toast.error(err.message);
+      } else {
+        toast.error("Unable to start scan.");
+      }
+    } finally {
+      setStartingProjectId(null);
+    }
+  };
+
   const totals = useMemo(() => {
     const values = Object.values(scanSummary);
     return {
@@ -82,10 +104,12 @@ export default function ProjectsPage() {
         <SummaryCard icon={Waves} label="Failed scans" value={totals.failed} />
       </section>
 
+      <RepositoryOpenActions onCreated={loadData} />
+
       <OpsCard
         chipDotClassName="bg-violet-500"
         chipLabel="Repository Index"
-        description="Open repository details and scan history."
+        description="Open repository details and run scans directly from this page."
         icon={FolderGit2}
         title="Repositories"
         contentClassName="space-y-2"
@@ -94,24 +118,39 @@ export default function ProjectsPage() {
           {projects.map((project) => {
             const summary = scanSummary[project.id] ?? { total: 0, running: 0, queued: 0, failed: 0 };
             return (
-              <Link
-                className="block rounded-xl bg-slate-100/90 p-3 transition"
-                href={`/projects/${project.id}`}
-                key={project.id}
-              >
+              <div className="rounded-xl bg-slate-100/90 p-3" key={project.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)]">{project.name}</p>
+                    <Link className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ink)]" href={`/projects/${project.id}`}>
+                      {project.name}
+                    </Link>
                     <p className="mt-1 break-all text-[11px] text-[var(--ink-muted)]">{project.repo_url || "No repository source configured"}</p>
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <Badge variant={summary.running > 0 ? "warning" : "default"}>{summary.running} running</Badge>
                     <Badge variant={summary.queued > 0 ? "warning" : "default"}>{summary.queued} queued</Badge>
                     <Badge variant={summary.failed > 0 ? "danger" : "default"}>{summary.failed} failed</Badge>
                     <Badge variant="default">{summary.total} total</Badge>
+                    <Button
+                      className="h-8 px-2.5"
+                      disabled={startingProjectId === project.id}
+                      onClick={() => void runScanForProject(project.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {startingProjectId === project.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                          Run scan
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
           {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}

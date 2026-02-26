@@ -1,0 +1,59 @@
+services:
+  postgres:
+    restart: unless-stopped
+    ports: []
+
+  redis:
+    restart: unless-stopped
+    ports: []
+
+  backend:
+    restart: unless-stopped
+    volumes:
+      - scan_uploads:/app/.scan-uploads
+    ports: []
+
+  worker:
+    restart: unless-stopped
+    volumes:
+      - scan_uploads:/app/.scan-uploads
+    depends_on:
+      - postgres
+      - redis
+      - backend
+
+  scanner:
+    restart: unless-stopped
+    volumes:
+      - scan_uploads:/app/.scan-uploads
+
+  frontend:
+    restart: unless-stopped
+    command: ["./scripts/prod-start.sh"]
+    volumes: []
+    ports: []
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  scan_uploads:
+  caddy_data:
+  caddy_config:

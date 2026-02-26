@@ -127,6 +127,12 @@ Services:
 - Frontend checks: `cd frontend && npm run lint && npm run build`
 - Docker cleanup: `make docker-clean`
 
+## Deploy (AWS Lightsail)
+- Production runbook: [`docs/deploy/lightsail.md`](docs/deploy/lightsail.md)
+- Production compose overlay: `docker-compose.lightsail.yml`
+- Bootstrap VM: `./infra/scripts/lightsail-vm-bootstrap.sh`
+- Deploy/update on VM: `./infra/scripts/lightsail-deploy.sh`
+
 ## Local Source Path Notes
 - Local scans are path-based by default; zip upload is available via scan-create API.
 - Paths must be container-visible under `${LOCAL_REPO_MOUNT_PATH}`.

@@ -24,6 +24,7 @@ import {
   getScan,
   listScanFindings,
 } from "@/lib/api";
+import { getScanFailureCause } from "@/lib/scan-failure";
 import type { Finding, Scan, Severity, Tool } from "@/types/api";
 
 const severityOptions: Array<"all" | Severity> = ["all", "critical", "high", "medium", "low", "info"];
@@ -132,6 +133,7 @@ export default function ScanPage() {
     if (scan.status === "running") return 65;
     return 100;
   }, [scan]);
+  const failureCause = useMemo(() => getScanFailureCause(scan), [scan]);
 
   const openFinding = async (findingId: number) => {
     try {
@@ -281,6 +283,7 @@ export default function ScanPage() {
             <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-muted)]">
               <div className="h-full rounded-full bg-[var(--primary)] transition-all" style={{ width: `${progress}%` }} />
             </div>
+            {failureCause ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">Failure cause: {failureCause}</p> : null}
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <Metric label="Critical" value={summary.critical} tone="critical" />
               <Metric label="High" value={summary.high} tone="high" />
