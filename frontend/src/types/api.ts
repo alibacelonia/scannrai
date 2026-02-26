@@ -44,6 +44,10 @@ export interface Finding {
   references: Array<{ type: string; value: string }>;
   raw: Record<string, unknown>;
   fingerprint: string;
+  ai_explanation?: string | null;
+  ai_fix_suggestion?: string | null;
+  ai_patch_diff?: string | null;
+  confidence?: number | null;
   created_at: string;
   snippet?: {
     start_line: number;
@@ -54,6 +58,20 @@ export interface Finding {
       highlighted: boolean;
     }>;
   } | null;
+}
+
+export interface FindingAiExplainResponse {
+  finding_id: number;
+  ai_explanation: string;
+  ai_fix_suggestion: string;
+  confidence: number;
+  warning: string;
+}
+
+export interface FindingAiPatchResponse {
+  finding_id: number;
+  ai_patch_diff: string;
+  warning: string;
 }
 
 export interface TokenPair {

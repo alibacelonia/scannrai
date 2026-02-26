@@ -22,3 +22,6 @@ This folder tracks build/runtime incidents with:
 - [2026-02-26 hydration mismatch in SSR/client output](./2026-02-26-hydration-mismatch-ssr-client-render.md)
 - [2026-02-26 login session lost on browser reload](./2026-02-26-auth-session-lost-on-reload.md)
 - [2026-02-26 scan execution and OSV normalization issues](./2026-02-26-scan-execution-and-osv-normalization.md)
+- [2026-02-26 finding snippet missing due premature workspace cleanup](./2026-02-26-scan-snippet-missing-workspace-retention-cleanup.md)
+- [2026-02-26 finding AI suggestion/fix not wired in scan detail modal](./2026-02-26-finding-ai-suggestion-ui-not-wired.md)
+- [2026-02-26 scan polling unauthorized and session drop while waiting](./2026-02-26-scan-polling-unauthorized-session-drop.md)

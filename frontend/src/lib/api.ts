@@ -1,7 +1,18 @@
-import { clearTokens, getAccessToken } from "@/lib/auth";
-import type { Finding, Paginated, Policy, Project, Scan, TokenPair, User } from "@/types/api";
+import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from "@/lib/auth";
+import type {
+  Finding,
+  FindingAiExplainResponse,
+  FindingAiPatchResponse,
+  Paginated,
+  Policy,
+  Project,
+  Scan,
+  TokenPair,
+  User,
+} from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+let refreshPromise: Promise<string | null> | null = null;
 
 class ApiError extends Error {
   status: number;
@@ -38,19 +49,26 @@ async function apiRequest<T>(
   init: RequestInit = {},
   options: { auth?: boolean } = { auth: true },
 ): Promise<T> {
-  const headers = new Headers(init.headers ?? {});
-  const token = getAccessToken();
-
-  if (options.auth && token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
+  const execute = async (token: string | null) => {
+    const headers = new Headers(init.headers ?? {});
+    if (options.auth && token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+    return fetch(`${API_BASE_URL}${path}`, {
       ...init,
       headers,
     });
+  };
+
+  let response: Response;
+  try {
+    response = await execute(getAccessToken());
+    if (options.auth && response.status === 401) {
+      const refreshedToken = await refreshAccessToken();
+      if (refreshedToken) {
+        response = await execute(refreshedToken);
+      }
+    }
   } catch (error) {
     throw new ApiError(
       "Cannot reach API. Check that backend is running and CORS is configured for http://localhost:3000.",
@@ -68,7 +86,7 @@ async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (options.auth && response.status === 401) {
       clearTokens();
     }
     const messageFromDetail =
@@ -81,6 +99,46 @@ async function apiRequest<T>(
   }
 
   return body as T;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    clearTokens();
+    return null;
+  }
+
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+      if (!response.ok) {
+        clearTokens();
+        return null;
+      }
+      const payload = (await response.json()) as { access?: string; refresh?: string };
+      if (!payload.access) {
+        clearTokens();
+        return null;
+      }
+      saveTokens({ access: payload.access, refresh: payload.refresh ?? refreshToken });
+      return payload.access;
+    } catch {
+      clearTokens();
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 }
 
 export async function login(username: string, password: string): Promise<TokenPair> {
@@ -188,11 +246,20 @@ export async function getFinding(findingId: number): Promise<Finding> {
   return apiRequest<Finding>(`/api/findings/${findingId}/`);
 }
 
-export async function exportScanJson(scanId: string): Promise<Blob> {
-  const token = getAccessToken();
-  const response = await fetch(`${API_BASE_URL}/api/scans/${scanId}/export.json/`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+export async function aiExplainFinding(findingId: number): Promise<FindingAiExplainResponse> {
+  return apiRequest<FindingAiExplainResponse>(`/api/findings/${findingId}/ai/explain/`, {
+    method: "POST",
   });
+}
+
+export async function aiPatchFinding(findingId: number): Promise<FindingAiPatchResponse> {
+  return apiRequest<FindingAiPatchResponse>(`/api/findings/${findingId}/ai/patch/`, {
+    method: "POST",
+  });
+}
+
+export async function exportScanJson(scanId: string): Promise<Blob> {
+  const response = await apiRequestBlob(`/api/scans/${scanId}/export.json/`);
   if (!response.ok) {
     throw new ApiError("Unable to export JSON report.", response.status);
   }
@@ -200,14 +267,30 @@ export async function exportScanJson(scanId: string): Promise<Blob> {
 }
 
 export async function exportScanMarkdown(scanId: string): Promise<Blob> {
-  const token = getAccessToken();
-  const response = await fetch(`${API_BASE_URL}/api/scans/${scanId}/export.md/`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const response = await apiRequestBlob(`/api/scans/${scanId}/export.md/`);
   if (!response.ok) {
     throw new ApiError("Unable to export Markdown report.", response.status);
   }
   return response.blob();
+}
+
+async function apiRequestBlob(path: string): Promise<Response> {
+  const execute = async (token: string | null) =>
+    fetch(`${API_BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+  let response = await execute(getAccessToken());
+  if (response.status === 401) {
+    const refreshedToken = await refreshAccessToken();
+    if (refreshedToken) {
+      response = await execute(refreshedToken);
+    }
+  }
+  if (response.status === 401) {
+    clearTokens();
+  }
+  return response;
 }
 
 export async function getPolicy(): Promise<Policy> {

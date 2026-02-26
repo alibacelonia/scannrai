@@ -13,7 +13,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApiError, exportScanJson, exportScanMarkdown, getFinding, getScan, listScanFindings } from "@/lib/api";
+import {
+  aiExplainFinding,
+  aiPatchFinding,
+  ApiError,
+  exportScanJson,
+  exportScanMarkdown,
+  getFinding,
+  getScan,
+  listScanFindings,
+} from "@/lib/api";
 import type { Finding, Scan, Severity, Tool } from "@/types/api";
 
 const severityOptions: Array<"all" | Severity> = ["all", "critical", "high", "medium", "low", "info"];
@@ -26,7 +35,11 @@ export default function ScanPage() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
-  const [detailTab, setDetailTab] = useState<"snippet" | "raw">("snippet");
+  const [detailTab, setDetailTab] = useState<"snippet" | "suggestion" | "patch" | "raw">("snippet");
+  const [aiExplainLoading, setAiExplainLoading] = useState(false);
+  const [aiPatchLoading, setAiPatchLoading] = useState(false);
+  const [aiWarning, setAiWarning] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
   const [severity, setSeverity] = useState<"" | Severity>("");
   const [tool, setTool] = useState<"" | Tool>("");
@@ -122,12 +135,82 @@ export default function ScanPage() {
   const openFinding = async (findingId: number) => {
     try {
       const detail = await getFinding(findingId);
+      setAiWarning(null);
+      setDetailError(null);
+      setAiExplainLoading(false);
+      setAiPatchLoading(false);
       setSelectedFinding(detail);
-      setDetailTab("snippet");
+      if (detail.ai_explanation || detail.ai_fix_suggestion) {
+        setDetailTab("suggestion");
+      } else if (detail.ai_patch_diff) {
+        setDetailTab("patch");
+      } else {
+        setDetailTab("snippet");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
       }
+    }
+  };
+
+  const generateAiSuggestion = async () => {
+    if (!selectedFinding) {
+      return;
+    }
+    setDetailError(null);
+    setAiExplainLoading(true);
+    try {
+      const response = await aiExplainFinding(selectedFinding.id);
+      setSelectedFinding((current) =>
+        current && current.id === response.finding_id
+          ? {
+              ...current,
+              ai_explanation: response.ai_explanation,
+              ai_fix_suggestion: response.ai_fix_suggestion,
+              confidence: response.confidence,
+            }
+          : current,
+      );
+      setAiWarning(response.warning || null);
+      setDetailTab("suggestion");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDetailError(err.message);
+      } else {
+        setDetailError("Unable to generate AI suggestion.");
+      }
+    } finally {
+      setAiExplainLoading(false);
+    }
+  };
+
+  const generateAiPatch = async () => {
+    if (!selectedFinding) {
+      return;
+    }
+    setDetailError(null);
+    setAiPatchLoading(true);
+    try {
+      const response = await aiPatchFinding(selectedFinding.id);
+      setSelectedFinding((current) =>
+        current && current.id === response.finding_id
+          ? {
+              ...current,
+              ai_patch_diff: response.ai_patch_diff,
+            }
+          : current,
+      );
+      setAiWarning(response.warning || null);
+      setDetailTab("patch");
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setDetailError(err.message);
+      } else {
+        setDetailError("Unable to generate AI patch.");
+      }
+    } finally {
+      setAiPatchLoading(false);
     }
   };
 
@@ -299,19 +382,44 @@ export default function ScanPage() {
         </Card>
       </section>
 
-      <Dialog open={Boolean(selectedFinding)} onOpenChange={(open) => !open && setSelectedFinding(null)}>
+      <Dialog
+        open={Boolean(selectedFinding)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedFinding(null);
+            setAiWarning(null);
+            setDetailError(null);
+            setAiExplainLoading(false);
+            setAiPatchLoading(false);
+          }
+        }}
+      >
         {selectedFinding ? (
           <DialogContent className="flex h-[90vh] max-w-3xl flex-col overflow-hidden p-0">
             <DialogHeader className="border-b border-slate-200 px-5 py-4">
               <DialogTitle className="text-base">Finding #{selectedFinding.id}</DialogTitle>
               <DialogDescription className="text-xs">
-                Review the highlighted snippet or raw scanner payload.
+                Review scanner evidence, then generate an AI suggestion or patch for faster remediation.
               </DialogDescription>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button disabled={aiExplainLoading} onClick={() => void generateAiSuggestion()} size="sm">
+                  {aiExplainLoading ? "Generating suggestion..." : selectedFinding.ai_fix_suggestion ? "Regenerate suggestion" : "Generate suggestion"}
+                </Button>
+                <Button disabled={aiPatchLoading} onClick={() => void generateAiPatch()} size="sm" variant="outline">
+                  {aiPatchLoading ? "Generating patch..." : selectedFinding.ai_patch_diff ? "Regenerate patch" : "Generate patch"}
+                </Button>
+              </div>
             </DialogHeader>
             <div className="flex-1 overflow-hidden p-4">
-              <Tabs className="flex h-full flex-col" onValueChange={(value) => setDetailTab(value as "snippet" | "raw")} value={detailTab}>
+              <Tabs
+                className="flex h-full flex-col"
+                onValueChange={(value) => setDetailTab(value as "snippet" | "suggestion" | "patch" | "raw")}
+                value={detailTab}
+              >
                 <TabsList>
                   <TabsTrigger value="snippet">Code Snippet</TabsTrigger>
+                  <TabsTrigger value="suggestion">AI Suggestion</TabsTrigger>
+                  <TabsTrigger value="patch">AI Patch</TabsTrigger>
                   <TabsTrigger value="raw">Raw JSON</TabsTrigger>
                 </TabsList>
                 <TabsContent className="h-full overflow-auto" value="snippet">
@@ -331,12 +439,56 @@ export default function ScanPage() {
                     <p className="text-xs text-slate-500">No snippet available for this finding.</p>
                   )}
                 </TabsContent>
+                <TabsContent className="h-full overflow-auto" value="suggestion">
+                  {selectedFinding.ai_explanation || selectedFinding.ai_fix_suggestion ? (
+                    <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      {selectedFinding.confidence !== null && selectedFinding.confidence !== undefined ? (
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          Confidence: {Math.round(selectedFinding.confidence * 100)}%
+                        </p>
+                      ) : null}
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Explanation</p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-900">
+                          {selectedFinding.ai_explanation || "No explanation generated yet."}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Suggested Fix</p>
+                        <pre className="overflow-auto rounded-lg bg-white p-3 text-xs text-slate-900">
+                          {selectedFinding.ai_fix_suggestion || "No fix suggestion generated yet."}
+                        </pre>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      No AI suggestion generated yet. Click &quot;Generate suggestion&quot; to create one.
+                    </p>
+                  )}
+                </TabsContent>
+                <TabsContent className="h-full overflow-auto" value="patch">
+                  {selectedFinding.ai_patch_diff ? (
+                    <div className="overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-2 font-mono text-xs">
+                      {selectedFinding.ai_patch_diff.split("\n").map((line, idx) => (
+                        <div className={`px-2 py-0.5 ${patchLineClassName(line)}`} key={`${idx}-${line.slice(0, 16)}`}>
+                          <span className="whitespace-pre-wrap break-words">{line || " "}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      No AI patch generated yet. Click &quot;Generate patch&quot; to create a proposed diff.
+                    </p>
+                  )}
+                </TabsContent>
                 <TabsContent className="h-full overflow-auto" value="raw">
                   <pre className="overflow-auto rounded-xl bg-slate-900 p-4 text-xs text-white">
                     {JSON.stringify(selectedFinding.raw, null, 2)}
                   </pre>
                 </TabsContent>
               </Tabs>
+              {aiWarning ? <p className="mt-3 text-xs font-medium text-amber-700">{aiWarning}</p> : null}
+              {detailError ? <p className="mt-3 text-xs font-medium text-red-700">{detailError}</p> : null}
             </div>
           </DialogContent>
         ) : null}
@@ -372,6 +524,22 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
+}
+
+function patchLineClassName(line: string) {
+  if (line.startsWith("+") && !line.startsWith("+++")) {
+    return "bg-emerald-950/40 text-emerald-300";
+  }
+  if (line.startsWith("-") && !line.startsWith("---")) {
+    return "bg-red-950/40 text-red-300";
+  }
+  if (line.startsWith("@@")) {
+    return "bg-sky-950/40 text-sky-300";
+  }
+  if (line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("+++ ") || line.startsWith("--- ")) {
+    return "bg-slate-900 text-amber-200";
+  }
+  return "text-slate-200";
 }
 
 function ScanSkeleton() {

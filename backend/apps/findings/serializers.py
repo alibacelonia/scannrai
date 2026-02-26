@@ -44,7 +44,7 @@ class FindingDetailSerializer(FindingSerializer):
     class Meta(FindingSerializer.Meta):
         fields = FindingSerializer.Meta.fields + ('snippet',)
 
-    def get_snippet(self, obj: Finding):
+    def _snippet_from_workspace_file(self, obj: Finding):
         if not obj.file_path:
             return None
 
@@ -83,3 +83,35 @@ class FindingDetailSerializer(FindingSerializer):
             )
 
         return {'start_line': start_line, 'end_line': end_line, 'lines': rows}
+
+    def _snippet_from_raw_payload(self, obj: Finding):
+        raw = obj.raw if isinstance(obj.raw, dict) else {}
+
+        lines: list[str] = []
+        if obj.tool == 'semgrep':
+            extra = raw.get('extra') if isinstance(raw.get('extra'), dict) else {}
+            raw_lines = extra.get('lines')
+            if isinstance(raw_lines, str) and raw_lines.strip():
+                lines = raw_lines.splitlines()
+        elif obj.tool == 'gitleaks':
+            raw_line = raw.get('line')
+            if isinstance(raw_line, str) and raw_line.strip():
+                lines = [raw_line]
+
+        if not lines:
+            return None
+
+        start_line = obj.line_start or 1
+        rows = []
+        for idx, content in enumerate(lines):
+            rows.append(
+                {
+                    'line_number': start_line + idx,
+                    'content': redact_text(content),
+                    'highlighted': True,
+                }
+            )
+        return {'start_line': start_line, 'end_line': start_line + len(lines) - 1, 'lines': rows}
+
+    def get_snippet(self, obj: Finding):
+        return self._snippet_from_workspace_file(obj) or self._snippet_from_raw_payload(obj)

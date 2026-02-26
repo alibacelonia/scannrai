@@ -1,6 +1,9 @@
+import os
 import subprocess
 import tempfile
+import time
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -8,13 +11,15 @@ from unittest.mock import patch
 from dulwich import porcelain
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.findings.models import Finding, FindingSeverity, FindingTool
 from apps.projects.models import Project
-from apps.scans.models import AuditEventType, AuditLog, Policy
+from apps.scans.models import AuditEventType, AuditLog, Policy, Scan, ScanStatus
+from apps.scans.services import cleanup_scan_workspace
 from apps.scans.tasks import scan_repo
 from apps.scans.tool_runners import run_osv_scanner
 
@@ -395,3 +400,45 @@ class PolicyApiTests(APITestCase):
         self.assertEqual(response.data['tools_enabled']['osv'], False)
         self.assertEqual(response.data['severity_threshold'], 'medium')
         self.assertEqual(response.data['retention_days'], 2)
+
+
+class WorkspaceCleanupTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='cleanup-user',
+            email='cleanup@example.com',
+            password='password123',
+        )
+        self.project = Project.objects.create(name='Cleanup Project', created_by=self.user)
+
+    def test_cleanup_uses_scan_finished_at_not_workspace_mtime(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            recent_scan = Scan.objects.create(
+                project=self.project,
+                status=ScanStatus.COMPLETED,
+                finished_at=timezone.now() - timedelta(hours=1),
+            )
+            stale_scan = Scan.objects.create(
+                project=self.project,
+                status=ScanStatus.COMPLETED,
+                finished_at=timezone.now() - timedelta(days=2),
+            )
+
+            recent_dir = Path(workspace) / str(recent_scan.id) / 'repo'
+            stale_dir = Path(workspace) / str(stale_scan.id) / 'repo'
+            recent_dir.mkdir(parents=True, exist_ok=True)
+            stale_dir.mkdir(parents=True, exist_ok=True)
+            recent_file = recent_dir / 'main.py'
+            stale_file = stale_dir / 'main.py'
+            recent_file.write_text('print("recent")\n')
+            stale_file.write_text('print("stale")\n')
+
+            old_epoch = time.time() - (5 * 24 * 3600)
+            for directory in (recent_dir.parent, stale_dir.parent):
+                os.utime(directory, times=(old_epoch, old_epoch))
+
+            with override_settings(SCAN_WORKDIR=workspace):
+                cleanup_scan_workspace(recent_scan.id, retention_seconds=24 * 3600)
+
+            self.assertTrue(recent_dir.parent.exists())
+            self.assertFalse(stale_dir.parent.exists())

@@ -211,3 +211,18 @@ class FindingAiEndpointsTests(APITestCase):
         patch_response = self.client.post(f'/api/findings/{self.finding.id}/ai/patch/')
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
         self.assertIn('ai_patch_diff', patch_response.data)
+
+    def test_finding_detail_snippet_falls_back_to_raw_when_workspace_missing(self):
+        self.scan.meta = {'repo_dir': '/tmp/scannrai/non-existent/repo'}
+        self.scan.save(update_fields=['meta', 'updated_at'])
+        self.finding.file_path = '/tmp/scannrai/non-existent/repo/src/app.py'
+        self.finding.line_start = 15
+        self.finding.line_end = 15
+        self.finding.raw = {'extra': {'lines': '        user.set_password(password)'}}
+        self.finding.save(update_fields=['file_path', 'line_start', 'line_end', 'raw'])
+
+        response = self.client.get(f'/api/findings/{self.finding.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data['snippet'])
+        self.assertEqual(response.data['snippet']['lines'][0]['line_number'], 15)
+        self.assertIn('user.set_password', response.data['snippet']['lines'][0]['content'])

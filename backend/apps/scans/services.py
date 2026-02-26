@@ -5,10 +5,12 @@ import subprocess
 import tempfile
 import time
 import zipfile
+from datetime import timedelta
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.utils import timezone
 
 from dulwich import porcelain
 from dulwich.repo import Repo
@@ -437,12 +439,38 @@ def cleanup_scan_workspace(scan_id: int, retention_seconds: int | None = None) -
         retention_seconds = int(settings.SCAN_RETENTION_SECONDS)
     current_workspace = _workspace_dir(scan_id)
 
-    if retention_seconds <= 0 and current_workspace.exists():
-        shutil.rmtree(current_workspace, ignore_errors=True)
+    if retention_seconds <= 0:
+        # Immediate cleanup mode.
+        if current_workspace.exists():
+            shutil.rmtree(current_workspace, ignore_errors=True)
+        for directory in workspace_root.iterdir():
+            if directory.is_dir() and directory != current_workspace:
+                shutil.rmtree(directory, ignore_errors=True)
+        return
 
-    cutoff = time.time() - retention_seconds
+    # Determine stale workspaces from scan completion timestamps in DB.
+    cutoff = timezone.now() - timedelta(seconds=retention_seconds)
+    stale_scan_ids = set(
+        Scan.objects.filter(finished_at__isnull=False, finished_at__lt=cutoff).values_list('id', flat=True)
+    )
+
     for directory in workspace_root.iterdir():
         if not directory.is_dir():
             continue
-        if directory.stat().st_mtime < cutoff:
+        if directory == current_workspace:
+            continue
+
+        directory_scan_id: int | None = None
+        try:
+            directory_scan_id = int(directory.name)
+        except (TypeError, ValueError):
+            directory_scan_id = None
+
+        if directory_scan_id is not None:
+            if directory_scan_id in stale_scan_ids:
+                shutil.rmtree(directory, ignore_errors=True)
+            continue
+
+        # Fallback for non-standard folders.
+        if directory.stat().st_mtime < time.time() - retention_seconds:
             shutil.rmtree(directory, ignore_errors=True)

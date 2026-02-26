@@ -45,6 +45,23 @@
 - `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 
+## 2026-02-26 — Fixed scan-page unauthorized logout during polling
+- Investigated issue where user was redirected to login while passively waiting for scan completion.
+- Root cause:
+  - frontend cleared tokens on first `401` from scan polling endpoints.
+  - no refresh-token flow was implemented in API client.
+- Fixes applied:
+  - added `getRefreshToken()` in auth helper.
+  - implemented refresh+retry-once in authenticated `apiRequest()` flow.
+  - added single-flight refresh guard to prevent concurrent refresh races.
+  - aligned export blob requests (`export.json`/`export.md`) to use same refresh behavior.
+- Logged issue in:
+  - `docs/error-logs/2026-02-26-scan-polling-unauthorized-session-drop.md`
+
+### Commands run
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+
 ## 2026-02-25 — Fixed local path fallback causing `/host/home/portfolio.sh` runtime access errors
 - Investigated local source failure:
   - `Repository source path is not accessible from scanner runtime: /host/home/portfolio.sh`
@@ -800,3 +817,41 @@
   - public repo scan queued and completed
   - export JSON/Markdown endpoints succeeded
   - secret redaction verified on finding raw payload (`***REDACTED***`, no secret leakage)
+
+## 2026-02-26 — Fixed missing finding snippet when workspace already cleaned
+- Investigated scan detail issue where finding line range existed but `Code Snippet` tab was empty.
+- Root cause:
+  - workspace cleanup used directory mtime and could remove active-retention scan workspaces prematurely.
+  - finding detail serializer only attempted filesystem snippet resolution.
+- Fixes applied:
+  - retention cleanup now uses `Scan.finished_at` lifecycle timestamps.
+  - finding detail serializer now falls back to sanitized raw payload snippet (`semgrep extra.lines`/`gitleaks line`) when workspace file is unavailable.
+- Added regression tests:
+  - `WorkspaceCleanupTests.test_cleanup_uses_scan_finished_at_not_workspace_mtime`
+  - `FindingAiEndpointsTests.test_finding_detail_snippet_falls_back_to_raw_when_workspace_missing`
+- Logged issue in:
+  - `docs/error-logs/2026-02-26-scan-snippet-missing-workspace-retention-cleanup.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test apps.projects.tests apps.scans.tests apps.findings.tests`
+- serializer validation in live container for finding `459` (scan `87`) confirmed snippet payload returns line 15.
+
+## 2026-02-26 — Wired AI suggestion and patch into finding detail modal
+- Investigated why suggested fix output was not visible in `/scans/{id}` finding detail.
+- Root cause:
+  - frontend had no client methods for finding AI endpoints.
+  - modal rendered only snippet/raw tabs with no AI actions.
+  - finding TS type lacked AI fields.
+- Fixes applied:
+  - added `aiExplainFinding` and `aiPatchFinding` in frontend API client.
+  - extended `Finding` type with `ai_explanation`, `ai_fix_suggestion`, `ai_patch_diff`, `confidence`.
+  - updated scan detail modal with:
+    - `Generate suggestion` and `Generate patch` actions
+    - `AI Suggestion` and `AI Patch` tabs
+    - loading/error states, confidence display, warning display.
+- Logged issue in:
+  - `docs/error-logs/2026-02-26-finding-ai-suggestion-ui-not-wired.md`
+
+### Commands run
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
