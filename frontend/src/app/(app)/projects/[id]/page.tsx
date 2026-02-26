@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, Link2, PlayCircle, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageShell } from "@/components/page-shell";
 import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
@@ -39,20 +40,18 @@ export default function ProjectPage() {
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const [projectData, scansData] = await Promise.all([getProject(projectId), listProjectScans(projectId)]);
       setProject(projectData);
       setScans(scansData.results);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Unable to load project.");
+        toast.error("Unable to load project.");
       }
     } finally {
       setLoading(false);
@@ -66,7 +65,6 @@ export default function ProjectPage() {
   const runScan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRunning(true);
-    setError(null);
     try {
       if (!project?.repo_url) {
         throw new ApiError("Set a repository source path or URL first.", 400);
@@ -76,9 +74,9 @@ export default function ProjectPage() {
       router.push(`/scans/${scan.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Unable to start scan.");
+        toast.error("Unable to start scan.");
       }
     } finally {
       setRunning(false);
@@ -145,7 +143,6 @@ export default function ProjectPage() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Accepted source types</p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">Local git repository folder, local `.zip`, or remote git URL.</p>
             </OpsPanel>
-            {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
         </OpsCard>
 
         <OpsCard

@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 
 import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveTokens } from "@/lib/auth";
-import { ApiError, login } from "@/lib/api";
+import { ApiError, getMe, login } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,10 +19,10 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const next = new URLSearchParams(window.location.search).get("next");
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next_url") || params.get("next");
     if (next) {
       setNextPath(next);
     }
@@ -30,17 +31,22 @@ export default function LoginPage() {
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       const tokens = await login(username, password);
       saveTokens(tokens);
+      const me = await getMe();
+      if (!me.has_completed_profile) {
+        const profileNext = nextPath && nextPath !== "/profile" ? nextPath : "/dashboard";
+        router.push(`/profile?next_url=${encodeURIComponent(profileNext)}`);
+        return;
+      }
       router.push(nextPath);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Unable to login right now.");
+        toast.error("Unable to login right now.");
       }
     } finally {
       setLoading(false);
@@ -79,7 +85,6 @@ export default function LoginPage() {
                 value={password}
               />
             </OpsPanel>
-            {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Signing in..." : "Sign in"}
               {!loading ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}

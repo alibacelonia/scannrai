@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   ChevronsUpDown,
   FolderGit2,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -123,6 +124,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const accountName = authUser?.username || "Account";
   const accountEmail = authUser?.email || "No email";
+  const displayName = authUser?.profile?.full_name?.trim() || accountName;
+
+  useEffect(() => {
+    if (!authUser || authUser.has_completed_profile || pathname.startsWith("/profile")) {
+      return;
+    }
+    const nextPath = pathname && pathname !== "/profile" ? pathname : "/dashboard";
+    router.replace(`/profile?next_url=${encodeURIComponent(nextPath)}`);
+  }, [authUser, pathname, router]);
   const accountInitials = useMemo(() => {
     const source = (authUser?.username || authUser?.email || "AC").trim();
     if (!source) {
@@ -139,6 +149,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (pathname.startsWith("/policy")) return "Policy";
     if (pathname.startsWith("/projects")) return "Repositories";
     if (pathname.startsWith("/scans")) return "Scans";
+    if (pathname.startsWith("/change-password")) return "Change Password";
     return "Dashboard";
   }, [pathname]);
 
@@ -167,7 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className={cn(
               "group flex items-center rounded-xl border-0 px-3 py-2.5 text-[13px] transition",
               active
-                ? "bg-white text-slate-900"
+                ? "bg-slate-200 text-slate-900"
                 : "text-slate-700 hover:bg-slate-100",
               compact && "justify-center px-0",
             )}
@@ -197,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {mode !== "compact" ? (
               <>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-slate-900">{accountName}</p>
+                  <p className="truncate text-[13px] font-semibold text-slate-900">{displayName}</p>
                   <p className="truncate text-xs text-slate-500">{accountEmail}</p>
                 </div>
                 <ChevronsUpDown className="ml-auto h-4 w-4 text-slate-500" />
@@ -215,7 +226,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2">
               <Avatar className="h-9 w-9" initials={accountInitials} />
               <div className="min-w-0">
-                <p className="truncate text-[13px] font-normal text-slate-900">{accountName}</p>
+                <p className="truncate text-[13px] font-normal text-slate-900">{displayName}</p>
                 <p className="truncate text-[11px] font-normal text-slate-500">{accountEmail}</p>
               </div>
             </div>
@@ -225,6 +236,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link className="cursor-pointer text-xs font-normal" href="/profile" onClick={() => setMobileDrawerOpen(false)}>
               <UserCircle2 className="mr-2 h-4 w-4" />
               Account
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="text-xs font-normal">
+            <Link className="cursor-pointer text-xs font-normal" href="/change-password" onClick={() => setMobileDrawerOpen(false)}>
+              <KeyRound className="mr-2 h-4 w-4" />
+              Change password
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -252,8 +269,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Shield className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-[13px] font-semibold text-slate-900">ScannrAI</p>
-                <p className="text-xs text-slate-500">Enterprise</p>
+                <p className="text-[15px] font-normal text-slate-900">ScannrAI</p>
               </div>
             </div>
           ) : null}
@@ -331,8 +347,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Shield className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-[13px] font-semibold text-slate-900">ScannrAI</p>
-                  <p className="text-xs text-slate-500">Enterprise</p>
+                  <p className="text-[15px] font-normal text-slate-900">ScannrAI</p>
                 </div>
               </div>
               <button

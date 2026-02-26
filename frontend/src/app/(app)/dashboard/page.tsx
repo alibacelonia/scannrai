@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FolderGit2, GitBranch, Laptop, Loader2, PlayCircle, ScanSearch, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,11 +28,6 @@ type PickerFile = File & {
   webkitRelativePath?: string;
   path?: string;
 };
-
-type BannerState = {
-  tone: "error" | "info";
-  message: string;
-} | null;
 
 function normalizeProjectName(candidate: string): string {
   const trimmed = candidate.trim();
@@ -121,7 +117,6 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectScans, setProjectScans] = useState<Record<number, Scan[]>>({});
   const [loading, setLoading] = useState(true);
-  const [banner, setBanner] = useState<BannerState>(null);
 
   const [remoteRepoUrl, setRemoteRepoUrl] = useState("");
   const [localSourcePath, setLocalSourcePath] = useState("");
@@ -131,12 +126,10 @@ export default function DashboardPage() {
   const [localOpening, setLocalOpening] = useState(false);
   const [localValidating, setLocalValidating] = useState(false);
   const [startingProjectId, setStartingProjectId] = useState<number | null>(null);
-  const [feedbackDialog, setFeedbackDialog] = useState<{ title: string; description: string } | null>(null);
   const [folderPickerDialogOpen, setFolderPickerDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setBanner(null);
     try {
       const projectPage = await listProjects();
       setProjects(projectPage.results);
@@ -150,9 +143,9 @@ export default function DashboardPage() {
       setProjectScans(Object.fromEntries(scansEntries));
     } catch (err) {
       if (err instanceof ApiError) {
-        setBanner({ tone: "error", message: err.message });
+        toast.error(err.message);
       } else {
-        setBanner({ tone: "error", message: "Unable to load dashboard." });
+        toast.error("Unable to load dashboard.");
       }
     } finally {
       setLoading(false);
@@ -232,7 +225,6 @@ export default function DashboardPage() {
   const openRemoteRepository = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRemoteOpening(true);
-    setBanner(null);
     try {
       const source = remoteRepoUrl.trim();
       const { sourceToSave } = await validateRemoteSource(source);
@@ -242,15 +234,12 @@ export default function DashboardPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (isDuplicateRepoError(err)) {
-          setFeedbackDialog({
-            title: "Repository already exists",
-            description: `${err.message} Open the existing repository from the list instead of creating another one.`,
-          });
+          toast.error(`${err.message} Open the existing repository from the list instead of creating another one.`);
         } else {
-          setBanner({ tone: "error", message: err.message });
+          toast.error(err.message);
         }
       } else {
-        setBanner({ tone: "error", message: "Unable to open repository." });
+        toast.error("Unable to open repository.");
       }
     } finally {
       setRemoteOpening(false);
@@ -260,12 +249,11 @@ export default function DashboardPage() {
   const openLocalRepository = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!localSourcePath.trim()) {
-      setBanner({ tone: "error", message: "Enter a local repository path first." });
+      toast.error("Enter a local repository path first.");
       return;
     }
 
     setLocalOpening(true);
-    setBanner(null);
     try {
       const source = localSourcePath.trim();
       const { sourceToSave } = await validateLocalSource(source);
@@ -278,15 +266,12 @@ export default function DashboardPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (isDuplicateRepoError(err)) {
-          setFeedbackDialog({
-            title: "Repository already exists",
-            description: `${err.message} Open the existing repository from the list instead of creating another one.`,
-          });
+          toast.error(`${err.message} Open the existing repository from the list instead of creating another one.`);
         } else {
-          setBanner({ tone: "error", message: err.message });
+          toast.error(err.message);
         }
       } else {
-        setBanner({ tone: "error", message: "Unable to open local repository." });
+        toast.error("Unable to open local repository.");
       }
     } finally {
       setLocalOpening(false);
@@ -302,30 +287,26 @@ export default function DashboardPage() {
       .then((result) => {
         if (result.candidates.length === 1) {
           setLocalSourcePath(result.candidates[0]);
-          setBanner({ tone: "info", message: `Resolved local source path automatically: ${result.candidates[0]}` });
+          toast.info(`Resolved local source path automatically: ${result.candidates[0]}`);
           return;
         }
         if (result.candidates.length > 1) {
           setLocalSourceCandidates(result.candidates);
           setLocalSourcePath(result.candidates[0]);
-          setBanner({ tone: "info", message: "Multiple matching local sources found. Choose the correct path below." });
+          toast.info("Multiple matching local sources found. Choose the correct path below.");
           return;
         }
         setLocalSourcePath("");
-        setBanner({
-          tone: "error",
-          message: `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full source path manually (example: ${fallbackHint}).`,
-        });
+        toast.error(
+          `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full source path manually (example: ${fallbackHint}).`,
+        );
       })
       .catch((err) => {
         setLocalSourcePath("");
         if (err instanceof ApiError) {
-          setBanner({ tone: "error", message: err.message });
+          toast.error(err.message);
         } else {
-          setBanner({
-            tone: "error",
-            message: `Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full source path manually (example: ${fallbackHint}).`,
-          });
+          toast.error(`Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full source path manually (example: ${fallbackHint}).`);
         }
       })
       .finally(() => setLocalValidating(false));
@@ -355,12 +336,12 @@ export default function DashboardPage() {
       setLocalSourcePath(inferredAbsolutePath);
       setLocalValidating(true);
       void validateLocalSource(inferredAbsolutePath)
-        .then(() => setBanner({ tone: "info", message: `Selected folder resolved to: ${inferredAbsolutePath}` }))
+        .then(() => toast.info(`Selected folder resolved to: ${inferredAbsolutePath}`))
         .catch((err) => {
           if (err instanceof ApiError) {
-            setBanner({ tone: "error", message: err.message });
+            toast.error(err.message);
           } else {
-            setBanner({ tone: "error", message: "Selected folder is not a valid repository source." });
+            toast.error("Selected folder is not a valid repository source.");
           }
         })
         .finally(() => setLocalValidating(false));
@@ -369,7 +350,7 @@ export default function DashboardPage() {
 
     const hasDirectoryStructure = files.some((file) => getRelativePath(file).includes("/"));
     if (!hasDirectoryStructure) {
-      setBanner({ tone: "error", message: "Could not determine folder path from selection. Paste the local repository path manually." });
+      toast.error("Could not determine folder path from selection. Paste the local repository path manually.");
       return;
     }
     discoverFromSelectedFolderName(rootFolder);
@@ -377,15 +358,14 @@ export default function DashboardPage() {
 
   const runScanForProject = async (projectId: number) => {
     setStartingProjectId(projectId);
-    setBanner(null);
     try {
       const scan = await createScan(String(projectId));
       router.push(`/scans/${scan.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setBanner({ tone: "error", message: err.message });
+        toast.error(err.message);
       } else {
-        setBanner({ tone: "error", message: "Unable to start scan." });
+        toast.error("Unable to start scan.");
       }
     } finally {
       setStartingProjectId(null);
@@ -484,18 +464,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
-
-      {banner ? (
-        <div
-          className={
-            banner.tone === "error"
-              ? "rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700"
-              : "rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-700"
-          }
-        >
-          {banner.message}
-        </div>
-      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="rounded-2xl border-slate-300 bg-white">
@@ -612,7 +580,6 @@ export default function DashboardPage() {
                       className="h-auto w-full justify-start px-3 py-2 text-left text-[11px] normal-case tracking-normal"
                       onClick={() => {
                         setLocalSourcePath(candidate);
-                        setBanner(null);
                       }}
                       size="sm"
                       type="button"
@@ -718,22 +685,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
-
-      <Dialog open={Boolean(feedbackDialog)} onOpenChange={(open) => !open && setFeedbackDialog(null)}>
-        {feedbackDialog ? (
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{feedbackDialog.title}</DialogTitle>
-              <DialogDescription>{feedbackDialog.description}</DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end px-5 pb-5 pt-2">
-              <Button onClick={() => setFeedbackDialog(null)} size="sm" type="button">
-                Close
-              </Button>
-            </div>
-          </DialogContent>
-        ) : null}
-      </Dialog>
 
       <Dialog open={folderPickerDialogOpen} onOpenChange={setFolderPickerDialogOpen}>
         <DialogContent className="max-w-md">

@@ -169,6 +169,29 @@ export async function getMe(): Promise<User> {
   return apiRequest<User>("/api/me/");
 }
 
+export async function updateMeProfile(payload: {
+  full_name?: string;
+  job_title?: string;
+  bio?: string;
+}): Promise<User> {
+  return apiRequest<User>("/api/me/", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ detail: string }> {
+  return apiRequest<{ detail: string }>("/api/auth/change-password/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+}
+
 export async function listProjects(): Promise<Paginated<Project>> {
   return apiRequest<Paginated<Project>>("/api/projects/");
 }

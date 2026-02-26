@@ -79,10 +79,20 @@ export interface TokenPair {
   refresh: string;
 }
 
+export interface UserProfile {
+  full_name: string;
+  job_title: string;
+  bio: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface User {
   id: number;
   username: string;
   email: string;
+  profile: UserProfile;
+  has_completed_profile: boolean;
 }
 
 export interface Policy {

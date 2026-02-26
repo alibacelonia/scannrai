@@ -21,7 +21,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (hydrated && !token) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      router.replace(`/login?next_url=${encodeURIComponent(pathname)}`);
     }
   }, [hydrated, pathname, router, token]);
 

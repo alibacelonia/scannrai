@@ -2,39 +2,53 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, UserPlus2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveTokens } from "@/lib/auth";
-import { ApiError, login, register } from "@/lib/api";
+import { ApiError, getMe, login, register } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [nextPath, setNextPath] = useState("/dashboard");
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next_url") || params.get("next");
+    if (next) {
+      setNextPath(next);
+    }
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
-    setError(null);
 
     try {
       await register(username, email, password);
       const tokens = await login(username, password);
       saveTokens(tokens);
-      router.push("/dashboard");
+      const me = await getMe();
+      if (!me.has_completed_profile) {
+        const profileNext = nextPath && nextPath !== "/profile" ? nextPath : "/dashboard";
+        router.push(`/profile?next_url=${encodeURIComponent(profileNext)}`);
+        return;
+      }
+      router.push(nextPath);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        toast.error(err.message);
       } else {
-        setError("Unable to create account right now.");
+        toast.error("Unable to create account right now.");
       }
     } finally {
       setLoading(false);
@@ -71,7 +85,6 @@ export default function RegisterPage() {
                 value={password}
               />
             </OpsPanel>
-            {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Creating..." : "Create account"}
               {!loading ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}
