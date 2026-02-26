@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { ShieldCheck, TimerReset } from "lucide-react";
+import { CircleHelp, ShieldCheck, TimerReset } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, getPolicy, updatePolicy } from "@/lib/api";
@@ -104,6 +105,7 @@ export default function PolicyPage() {
             <div className="grid gap-2 sm:grid-cols-3">
               <PolicyToggle
                 checked={policy.tools_enabled.semgrep}
+                description="Semgrep performs static code analysis to detect security issues and risky patterns directly in source code."
                 label="Semgrep"
                 onCheckedChange={(checked) =>
                   setPolicy((current) =>
@@ -118,6 +120,7 @@ export default function PolicyPage() {
               />
               <PolicyToggle
                 checked={policy.tools_enabled.osv}
+                description="OSV checks dependencies and lockfiles for known vulnerabilities from the OSV vulnerability database."
                 label="OSV"
                 onCheckedChange={(checked) =>
                   setPolicy((current) =>
@@ -132,6 +135,7 @@ export default function PolicyPage() {
               />
               <PolicyToggle
                 checked={policy.tools_enabled.gitleaks}
+                description="Gitleaks detects accidentally committed secrets such as API keys, tokens, and credentials."
                 label="Gitleaks"
                 onCheckedChange={(checked) =>
                   setPolicy((current) =>
@@ -155,7 +159,13 @@ export default function PolicyPage() {
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity threshold</p>
+              <div className="flex items-center gap-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity threshold</p>
+                <InfoPopover
+                  description="Defines the minimum severity level to emphasize when reviewing scan results and policy decisions."
+                  title="Severity threshold"
+                />
+              </div>
               <Select
                 onValueChange={(value) => setPolicy((current) => (current ? { ...current, severity_threshold: value as Severity } : current))}
                 value={policy.severity_threshold}
@@ -243,18 +253,45 @@ export default function PolicyPage() {
 
 function PolicyToggle({
   checked,
+  description,
   label,
   onCheckedChange,
 }: {
   checked: boolean;
+  description: string;
   label: string;
   onCheckedChange: (value: boolean) => void;
 }) {
+  const fieldId = `policy-tool-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
   return (
-    <label className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] px-3 py-2 text-xs">
-      <input checked={checked} onChange={(event) => onCheckedChange(event.target.checked)} type="checkbox" />
-      {label}
-    </label>
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] px-3 py-2 text-xs">
+      <label className="flex items-center gap-2" htmlFor={fieldId}>
+        <input checked={checked} id={fieldId} onChange={(event) => onCheckedChange(event.target.checked)} type="checkbox" />
+        {label}
+      </label>
+      <InfoPopover description={description} title={label} />
+    </div>
+  );
+}
+
+function InfoPopover({ title, description }: { title: string; description: string }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          aria-label={`What is ${title}?`}
+          className="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:text-slate-700"
+          type="button"
+        >
+          <CircleHelp className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">{title}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-700">{description}</p>
+      </PopoverContent>
+    </Popover>
   );
 }
 
