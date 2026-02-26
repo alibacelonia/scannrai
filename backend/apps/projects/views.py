@@ -14,6 +14,7 @@ from apps.scans.serializers import ScanCreateSerializer, ScanSerializer
 from apps.scans.services import (
     discover_local_source_candidates,
     persist_uploaded_zip_for_scan,
+    recover_stale_running_scans,
     validate_repository_source_reference,
 )
 from apps.scans.tasks import scan_repo
@@ -61,6 +62,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
             if page is not None:
                 return self.get_paginated_response(ScanSerializer(page, many=True).data)
             return Response(ScanSerializer(queryset, many=True).data)
+
+        recover_stale_running_scans()
 
         one_hour_ago = timezone.now() - timedelta(hours=1)
         recent_scan_count = Scan.objects.filter(

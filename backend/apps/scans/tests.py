@@ -19,7 +19,7 @@ from rest_framework.test import APITestCase
 from apps.findings.models import Finding, FindingSeverity, FindingTool
 from apps.projects.models import Project
 from apps.scans.models import AuditEventType, AuditLog, Policy, Scan, ScanStatus
-from apps.scans.services import cleanup_scan_workspace
+from apps.scans.services import cleanup_scan_workspace, recover_stale_running_scans
 from apps.scans.tasks import scan_repo
 from apps.scans.tool_runners import run_osv_scanner
 
@@ -442,3 +442,31 @@ class WorkspaceCleanupTests(TestCase):
 
             self.assertTrue(recent_dir.parent.exists())
             self.assertFalse(stale_dir.parent.exists())
+
+
+class ScanRecoveryTests(TestCase):
+    def test_recover_stale_running_scan_marks_failed_and_writes_audit_event(self):
+        user = get_user_model().objects.create_user(
+            username='recovery-user',
+            email='recovery@example.com',
+            password='password123',
+        )
+        project = Project.objects.create(name='Recovery Project', created_by=user, repo_url='/tmp/recovery-repo')
+        scan = Scan.objects.create(project=project, status=ScanStatus.RUNNING, meta={'task_id': 'task-recovery'})
+        Scan.objects.filter(id=scan.id).update(updated_at=timezone.now() - timedelta(hours=2))
+
+        recovered = recover_stale_running_scans(timeout_seconds=60)
+
+        self.assertEqual(recovered, 1)
+        scan.refresh_from_db()
+        self.assertEqual(scan.status, ScanStatus.FAILED)
+        self.assertIsNotNone(scan.finished_at)
+        self.assertIn('stale_recovery', scan.meta)
+        self.assertEqual(scan.meta['stale_recovery']['timeout_seconds'], 60)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                scan=scan,
+                event_type=AuditEventType.SCAN_FAILED,
+                message='Scan marked failed by stale-scan recovery.',
+            ).exists()
+        )

@@ -14,8 +14,9 @@ from django.utils import timezone
 
 from dulwich import porcelain
 from dulwich.repo import Repo
+from apps.scans.audit import record_audit_event
 
-from .models import Scan
+from .models import AuditEventType, Scan, ScanStatus
 from .security import stable_json_hash
 
 
@@ -493,3 +494,46 @@ def cleanup_scan_workspace(scan_id: int, retention_seconds: int | None = None) -
         # Fallback for non-standard folders.
         if directory.stat().st_mtime < time.time() - retention_seconds:
             shutil.rmtree(directory, ignore_errors=True)
+
+
+def recover_stale_running_scans(timeout_seconds: int | None = None) -> int:
+    if timeout_seconds is None:
+        timeout_seconds = int(getattr(settings, 'SCAN_STALE_RUNNING_TIMEOUT_SECONDS', 2100))
+    if timeout_seconds <= 0:
+        return 0
+
+    cutoff = timezone.now() - timedelta(seconds=timeout_seconds)
+    stale_scans = list(
+        Scan.objects.select_related('project').filter(status=ScanStatus.RUNNING, updated_at__lt=cutoff)
+    )
+    if not stale_scans:
+        return 0
+
+    now = timezone.now()
+    recovered = 0
+    for scan in stale_scans:
+        reason = (
+            f'Scan had no status update for more than {timeout_seconds} seconds. '
+            'Marked failed by recovery watchdog.'
+        )
+        meta = dict(scan.meta or {})
+        meta['stale_recovery'] = {
+            'at': now.isoformat(),
+            'timeout_seconds': timeout_seconds,
+            'reason': reason,
+        }
+        scan.meta = meta
+        scan.status = ScanStatus.FAILED
+        if not scan.finished_at:
+            scan.finished_at = now
+        scan.save(update_fields=['status', 'meta', 'finished_at', 'updated_at'])
+        record_audit_event(
+            scan=scan,
+            event_type=AuditEventType.SCAN_FAILED,
+            user=scan.project.created_by,
+            message='Scan marked failed by stale-scan recovery.',
+            meta={'reason': reason, 'timeout_seconds': timeout_seconds},
+        )
+        recovered += 1
+
+    return recovered

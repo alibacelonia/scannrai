@@ -52,6 +52,8 @@ Each finding persists:
 - Secret redaction in persisted raw payloads and API responses
 - IP-level middleware throttle for scan creation + per-user/hour scan rate limit
 - Workspace cleanup with retention policy
+- Crash-safe Celery delivery (`acks_late` + `reject_on_worker_lost`) with Redis visibility timeout
+- Stale-running scan recovery watchdog to fail orphaned `running` scans safely
 - Structured scan logging with `scan_correlation_id`
 
 ## API Endpoints
@@ -67,6 +69,7 @@ Each finding persists:
 - `GET /api/scans/{id}/export.md`
 - `GET /api/policy`
 - `PUT /api/policy`
+- `POST /api/auth/change-password`
 
 ## Local Setup
 
@@ -87,8 +90,14 @@ Important vars:
 - `SCAN_ZIP_MAX_BYTES`, `SCAN_ZIP_MAX_FILES`
 - `SCAN_SHARED_UPLOAD_DIR` (backend/worker shared path for uploaded zip ingestion)
 - `SCAN_RETENTION_SECONDS`, `SCAN_RATE_LIMIT_PER_HOUR`, `SCAN_CREATE_IP_RATE_LIMIT_PER_MINUTE`
+- `SCAN_STALE_RUNNING_TIMEOUT_SECONDS`
 - `LOCAL_REPO_MOUNT_PATH` (default `/host/home`)
 - `AI_FEATURE_ENABLED` (`1` enabled, `0` disabled)
+- Celery delivery hardening:
+  - `CELERY_TASK_ACKS_LATE`
+  - `CELERY_TASK_REJECT_ON_WORKER_LOST`
+  - `CELERY_WORKER_PREFETCH_MULTIPLIER`
+  - `CELERY_BROKER_VISIBILITY_TIMEOUT`
 
 ### 2) Start stack
 ```bash
@@ -113,6 +122,7 @@ Services:
 - Stop: `docker compose down`
 - Logs: `docker compose logs -f backend worker frontend`
 - Run migrations: `docker compose exec backend python manage.py migrate`
+- Recover orphaned running scans manually: `docker compose exec backend python manage.py recover_stale_scans`
 - Backend tests: `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test`
 - Frontend checks: `cd frontend && npm run lint && npm run build`
 - Docker cleanup: `make docker-clean`

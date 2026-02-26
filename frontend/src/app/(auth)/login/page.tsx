@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
-import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
+import { OpsCard } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveTokens } from "@/lib/auth";
@@ -66,7 +66,7 @@ export default function LoginPage() {
           contentClassName=""
         >
           <form className="space-y-4" onSubmit={onSubmit}>
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Username</label>
               <Input
                 autoComplete="username"
@@ -74,8 +74,8 @@ export default function LoginPage() {
                 placeholder="your-username"
                 value={username}
               />
-            </OpsPanel>
-            <OpsPanel className="space-y-1">
+            </div>
+            <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Password</label>
               <Input
                 autoComplete="current-password"
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
               />
-            </OpsPanel>
+            </div>
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Signing in..." : "Sign in"}
               {!loading ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}

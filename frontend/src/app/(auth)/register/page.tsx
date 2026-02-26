@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, UserPlus2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
+import { OpsCard } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveTokens } from "@/lib/auth";
@@ -68,15 +68,15 @@ export default function RegisterPage() {
           contentClassName=""
         >
           <form className="space-y-4" onSubmit={onSubmit}>
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Username</label>
               <Input onChange={(event) => setUsername(event.target.value)} placeholder="your-username" value={username} />
-            </OpsPanel>
-            <OpsPanel className="space-y-1">
+            </div>
+            <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Email</label>
               <Input onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" value={email} />
-            </OpsPanel>
-            <OpsPanel className="space-y-1">
+            </div>
+            <div className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Password</label>
               <Input
                 onChange={(event) => setPassword(event.target.value)}
@@ -84,7 +84,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
               />
-            </OpsPanel>
+            </div>
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Creating..." : "Create account"}
               {!loading ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}

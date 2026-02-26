@@ -10,7 +10,7 @@ from apps.scans.audit import record_audit_event
 from apps.scans.security import redact_text, truncate_text
 
 from .models import AuditEventType, Scan, ScanStatus
-from .services import cleanup_scan_workspace, ingest_scan_from_zip_path, ingest_scan_source
+from .services import cleanup_scan_workspace, ingest_scan_from_zip_path, ingest_scan_source, recover_stale_running_scans
 from .tool_runners import detect_tool_versions, run_all_tools
 
 logger = logging.getLogger(__name__)
@@ -70,14 +70,22 @@ def ai_enrich_finding(finding_id: int) -> dict:
     return {'enabled': False, 'detail': 'AI enrichment is not enabled.', 'finding_id': finding_id}
 
 
-@shared_task
-def scan_repo(scan_id: int, zip_path: str | None = None) -> str:
+@shared_task(bind=True, acks_late=True, reject_on_worker_lost=True)
+def scan_repo(self, scan_id: int, zip_path: str | None = None) -> str:
+    recovered_count = recover_stale_running_scans()
+    if recovered_count:
+        logger.warning({'event': 'stale_scan_recovered', 'recovered_count': recovered_count})
+
     scan = Scan.objects.select_related('project').get(id=scan_id)
     correlation_id = str((scan.meta or {}).get('scan_correlation_id') or f'scan-{scan_id}')
     policy = _policy_for_scan(scan)
     uploaded_zip_path = str((scan.meta or {}).get('uploaded_zip_path') or '')
 
     _log_scan_event(scan_id, correlation_id, 'scan_starting', project_id=scan.project_id, enabled_tools=policy['enabled_tools'])
+
+    if scan.status == ScanStatus.COMPLETED:
+        _log_scan_event(scan_id, correlation_id, 'scan_skipped_already_completed')
+        return scan.status
 
     scan.status = ScanStatus.RUNNING
     scan.started_at = timezone.now()
