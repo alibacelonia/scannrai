@@ -516,7 +516,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={openRemoteRepository}>
-              <div className="space-y-1 rounded-xl bg-slate-100/90 px-3 py-3">
+              <div className="space-y-1">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Remote URL</label>
                 <Input
                   onChange={(event) => setRemoteRepoUrl(event.target.value)}
@@ -565,7 +565,7 @@ export default function DashboardPage() {
               onChange={handleLocalFolderSelection}
             />
             <form className="space-y-3" onSubmit={openLocalRepository}>
-              <div className="space-y-1 rounded-xl bg-slate-100/90 px-3 py-3">
+              <div className="space-y-1">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Local source path</label>
                 <Input
                   onChange={(event) => setLocalSourcePath(event.target.value)}

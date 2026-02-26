@@ -299,7 +299,7 @@ export default function ScanPage() {
           contentClassName="space-y-4"
         >
             <div className="grid gap-3 md:grid-cols-4">
-              <OpsPanel className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity</p>
                 <Select onValueChange={(value) => setSeverity(value === "all" ? "" : (value as Severity))} value={severity || "all"}>
                   <SelectTrigger>
@@ -313,9 +313,9 @@ export default function ScanPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </OpsPanel>
+              </div>
 
-              <OpsPanel className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Tool</p>
                 <Select onValueChange={(value) => setTool(value === "all" ? "" : (value as Tool))} value={tool || "all"}>
                   <SelectTrigger>
@@ -329,17 +329,17 @@ export default function ScanPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </OpsPanel>
+              </div>
 
-              <OpsPanel className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Category</p>
                 <Input onChange={(event) => setCategory(event.target.value)} placeholder="Filter category" value={category} />
-              </OpsPanel>
+              </div>
 
-              <OpsPanel className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">File path</p>
                 <Input onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter file" value={fileQuery} />
-              </OpsPanel>
+              </div>
             </div>
 
             <OpsPanel className="px-0 py-0">

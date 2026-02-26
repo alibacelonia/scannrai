@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Filter, Search, ShieldAlert, Timer } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
-import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
+import { OpsCard, OpsMetricCard } from "@/components/ui/ops-card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -111,7 +111,7 @@ export default function ScansPage() {
         title="All scans"
         contentClassName="space-y-3"
       >
-          <OpsPanel className="space-y-1">
+          <div className="space-y-1">
             <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Repository filter</label>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-subtle)]" />
@@ -122,7 +122,7 @@ export default function ScansPage() {
                 value={projectFilter}
               />
             </div>
-          </OpsPanel>
+          </div>
           {filteredRows.length === 0 ? <p className="text-xs text-[var(--ink-muted)]">No scans found.</p> : null}
           <div className="space-y-2">
             {filteredRows.map((row) => (

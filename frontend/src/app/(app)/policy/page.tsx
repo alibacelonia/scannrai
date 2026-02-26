@@ -161,7 +161,7 @@ export default function PolicyPage() {
           title="Thresholds and timeouts"
           contentClassName="grid gap-3 md:grid-cols-2"
         >
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <div className="flex items-center gap-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity threshold</p>
                 <InfoPopover
@@ -184,9 +184,9 @@ export default function PolicyPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </OpsPanel>
+            </div>
 
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Retention days</p>
               <Input
                 min={1}
@@ -196,9 +196,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.retention_days}
               />
-            </OpsPanel>
+            </div>
 
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Semgrep timeout (s)</p>
               <Input
                 min={30}
@@ -210,9 +210,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.semgrep_timeout_seconds}
               />
-            </OpsPanel>
+            </div>
 
-            <OpsPanel className="space-y-1">
+            <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">OSV timeout (s)</p>
               <Input
                 min={30}
@@ -224,9 +224,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.osv_timeout_seconds}
               />
-            </OpsPanel>
+            </div>
 
-            <OpsPanel className="space-y-1 md:col-span-2">
+            <div className="space-y-1 md:col-span-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Gitleaks timeout (s)</p>
               <Input
                 min={30}
@@ -238,7 +238,7 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.gitleaks_timeout_seconds}
               />
-            </OpsPanel>
+            </div>
         </OpsCard>
 
         <div className="flex flex-wrap items-center gap-2">
