@@ -163,6 +163,12 @@ def _validate_remote_git_reference(reference: str) -> str:
         raise ValueError('Remote repository URL must not contain embedded credentials.')
     if not parsed.netloc:
         raise ValueError('Remote repository URL is invalid.')
+    path_parts = [part for part in (parsed.path or '').split('/') if part]
+    if len(path_parts) < 2:
+        raise ValueError(
+            'Remote repository URL must include repository path segments '
+            '(example: https://github.com/<owner>/<repo>).'
+        )
     return reference
 
 

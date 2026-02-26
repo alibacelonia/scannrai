@@ -2,6 +2,8 @@ from urllib.parse import urlparse, urlunparse
 
 from rest_framework import serializers
 
+from apps.scans.services import validate_repository_source_reference
+
 from .models import Project
 
 
@@ -46,7 +48,13 @@ class ProjectSerializer(serializers.ModelSerializer):
         if value in (None, ''):
             return None
         request = self.context.get('request')
-        normalized = normalize_repository_source(value)
+        try:
+            validation = validate_repository_source_reference(value)
+            canonical_source = validation.get('resolved_path') or validation.get('reference') or value
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
+        normalized = normalize_repository_source(canonical_source)
         if not normalized:
             return None
 

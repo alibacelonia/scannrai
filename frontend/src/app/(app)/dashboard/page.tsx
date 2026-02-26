@@ -214,12 +214,27 @@ export default function DashboardPage() {
     };
   }, []);
 
+  const validateRemoteSource = useCallback(async (sourceUrl: string): Promise<{ sourceToSave: string }> => {
+    const validation = await validateRepositorySource(sourceUrl);
+    if (validation.kind !== "remote_git") {
+      throw new ApiError(
+        "Remote source must be a git repository URL (example: https://github.com/<owner>/<repo>).",
+        400,
+      );
+    }
+    return {
+      sourceToSave: validation.reference ?? sourceUrl,
+    };
+  }, []);
+
   const openRemoteRepository = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRemoteOpening(true);
     setBanner(null);
     try {
-      const project = await createProject(deriveNameFromRepoUrl(remoteRepoUrl), remoteRepoUrl.trim());
+      const source = remoteRepoUrl.trim();
+      const { sourceToSave } = await validateRemoteSource(source);
+      const project = await createProject(deriveNameFromRepoUrl(sourceToSave), sourceToSave);
       setRemoteRepoUrl("");
       router.push(`/projects/${project.id}`);
     } catch (err) {
@@ -392,7 +407,7 @@ export default function DashboardPage() {
       }
     >
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <Card className="rounded-2xl border-slate-300 bg-gradient-to-br from-white to-slate-50/80">
+        <Card className="rounded-2xl border-slate-300 bg-white">
           <CardHeader className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">

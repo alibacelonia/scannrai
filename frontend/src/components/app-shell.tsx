@@ -376,8 +376,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           desktopCollapsed ? "left-[72px]" : "left-56",
         )}
       >
-        <span>Local scan paths must be container-visible</span>
-        <span className="text-slate-400">/host/home/... or /Users/...</span>
+        <span>&copy; {new Date().getFullYear()} ScannrAI. All rights reserved.</span>
+        <span className="text-slate-400 normal-case">
+          Developed by{" "}
+          <Link className="underline underline-offset-2 hover:text-slate-500" href="#">
+            Ali Bacelonia
+          </Link>
+        </span>
       </footer>
     </div>
   );

@@ -46,16 +46,18 @@ class ProjectApiTests(APITestCase):
         self.assertEqual(delete_response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_project_accepts_local_repository_path(self):
-        response = self.client.post(
-            '/api/projects/',
-            {
-                'name': 'Local Project',
-                'repo_url': '/host/home/dev/demo-repo',
-            },
-            format='json',
-        )
+        with tempfile.TemporaryDirectory() as repo_dir:
+            porcelain.init(repo_dir)
+            response = self.client.post(
+                '/api/projects/',
+                {
+                    'name': 'Local Project',
+                    'repo_url': repo_dir,
+                },
+                format='json',
+            )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['repo_url'], '/host/home/dev/demo-repo')
+        self.assertEqual(response.data['repo_url'], repo_dir)
 
     def test_project_rejects_duplicate_repository_source(self):
         self.client.post(
@@ -88,6 +90,15 @@ class ProjectApiTests(APITestCase):
 
         self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('already exists', str(duplicate_response.data))
+
+    def test_project_rejects_non_repository_remote_url(self):
+        response = self.client.post(
+            '/api/projects/',
+            {'name': 'Invalid Remote', 'repo_url': 'http://localhost:3000/dashboard'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('repository path segments', str(response.data))
 
     def test_validate_source_accepts_local_git_repo(self):
         with tempfile.TemporaryDirectory() as repo_dir:
@@ -122,6 +133,15 @@ class ProjectApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['valid'])
         self.assertEqual(response.data['kind'], 'local_zip')
+
+    def test_validate_source_rejects_remote_url_without_repository_path(self):
+        response = self.client.post(
+            '/api/projects/validate-source/',
+            {'source': 'http://localhost:3000/dashboard'},
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('repository path segments', response.data['detail'])
 
     def test_discover_source_returns_matching_git_repo_paths(self):
         with tempfile.TemporaryDirectory() as mount_root:
