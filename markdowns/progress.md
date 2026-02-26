@@ -45,6 +45,44 @@
 - `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 
+## 2026-02-26 — Fixed folder-picker auto-discovery for non-preferred roots
+- Investigated local folder selection issue where choosing repo under `.../Freelance/...` did not proceed, while manual paste worked.
+- Root cause:
+  - picker did not expose absolute path (browser limitation).
+  - backend discovery favored fixed preferred roots and could miss repos outside them.
+- Fixes applied:
+  - broadened discovery to search both configured mount root and host-home roots.
+  - retained preferred subroots but always search the root itself as fallback.
+  - improved local path hint/error text in dashboard to avoid `personal-projects`-only guidance.
+- Added tests:
+  - `test_discover_source_finds_repo_outside_preferred_subdirs`
+  - `test_discover_source_uses_host_home_when_mount_root_missing`
+- Logged issue in:
+  - `docs/error-logs/2026-02-26-folder-picker-missed-nonpreferred-root.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test apps.projects.tests`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+
+## 2026-02-26 — Fixed folder-picker discovery mismatch for `.git` file repos
+- User still hit `no matches were auto-discovered` for selected folder while manual paste worked.
+- Root cause:
+  - discovery required `.git` to be a directory.
+  - validation only required `.git` to exist (file or directory).
+  - worktree-style repos (`.git` file) were excluded by discovery.
+- Fixes applied:
+  - changed discovery repository check from `.git.is_dir()` to `.git.exists()`.
+  - restarted backend container to load updated code.
+- Added regression test:
+  - `test_discover_source_accepts_git_marker_file`
+- Logged issue in:
+  - `docs/error-logs/2026-02-26-folder-picker-git-marker-file-mismatch.md`
+
+### Commands run
+- `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test apps.projects.tests`
+- `docker compose restart backend`
+
 ## 2026-02-26 — Fixed scan-page unauthorized logout during polling
 - Investigated issue where user was redirected to login while passively waiting for scan completion.
 - Root cause:

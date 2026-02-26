@@ -1,6 +1,24 @@
+from urllib.parse import urlparse, urlunparse
+
 from rest_framework import serializers
 
 from .models import Project
+
+
+def normalize_repository_source(value: str) -> str:
+    candidate = str(value or '').strip()
+    if not candidate:
+        return ''
+
+    parsed = urlparse(candidate)
+    if parsed.scheme in ('http', 'https') and parsed.netloc:
+        path = (parsed.path or '').rstrip('/')
+        if path.lower().endswith('.git'):
+            path = path[:-4]
+        return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), path, '', '', ''))
+
+    normalized = candidate.replace('\\', '/').rstrip('/')
+    return normalized or candidate.replace('\\', '/')
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -27,4 +45,19 @@ class ProjectSerializer(serializers.ModelSerializer):
     def validate_repo_url(self, value):
         if value in (None, ''):
             return None
-        return value.strip()
+        request = self.context.get('request')
+        normalized = normalize_repository_source(value)
+        if not normalized:
+            return None
+
+        if request and request.user and request.user.is_authenticated:
+            queryset = Project.objects.filter(created_by=request.user)
+            if self.instance:
+                queryset = queryset.exclude(pk=self.instance.pk)
+            for existing in queryset.only('id', 'name', 'repo_url'):
+                if normalize_repository_source(existing.repo_url or '') == normalized:
+                    raise serializers.ValidationError(
+                        f'Repository source already exists in project "{existing.name}" (id={existing.id}).'
+                    )
+
+        return normalized

@@ -57,6 +57,38 @@ class ProjectApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['repo_url'], '/host/home/dev/demo-repo')
 
+    def test_project_rejects_duplicate_repository_source(self):
+        self.client.post(
+            '/api/projects/',
+            {'name': 'Demo Project', 'repo_url': 'https://github.com/example/demo'},
+            format='json',
+        )
+
+        duplicate_response = self.client.post(
+            '/api/projects/',
+            {'name': 'Demo Project Duplicate', 'repo_url': 'https://github.com/example/demo'},
+            format='json',
+        )
+
+        self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already exists', str(duplicate_response.data))
+
+    def test_project_rejects_duplicate_repository_source_after_normalization(self):
+        self.client.post(
+            '/api/projects/',
+            {'name': 'Demo Project', 'repo_url': 'https://github.com/example/demo.git/'},
+            format='json',
+        )
+
+        duplicate_response = self.client.post(
+            '/api/projects/',
+            {'name': 'Demo Project Duplicate', 'repo_url': 'https://github.com/example/demo'},
+            format='json',
+        )
+
+        self.assertEqual(duplicate_response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('already exists', str(duplicate_response.data))
+
     def test_validate_source_accepts_local_git_repo(self):
         with tempfile.TemporaryDirectory() as repo_dir:
             porcelain.init(repo_dir)
@@ -111,4 +143,78 @@ class ProjectApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['folder_name'], 'scannrai')
+        self.assertIn(str(repo_dir), response.data['candidates'])
+
+    def test_discover_source_finds_repo_outside_preferred_subdirs(self):
+        with tempfile.TemporaryDirectory() as mount_root:
+            # Keep preferred directory present so discovery does not regress to preferred-only roots.
+            (Path(mount_root) / 'personal-projects').mkdir(parents=True, exist_ok=True)
+
+            repo_dir = Path(mount_root) / 'Freelance' / 'IronFort-Compliance' / 'ironforte-prowler'
+            repo_dir.mkdir(parents=True, exist_ok=True)
+            porcelain.init(str(repo_dir))
+            main_file = Path(repo_dir, 'main.py')
+            main_file.write_text('print("ok")\n')
+            porcelain.add(repo=str(repo_dir), paths=[str(main_file)])
+            porcelain.commit(
+                repo=str(repo_dir),
+                message=b'init',
+                author=b'Test <test@example.com>',
+                committer=b'Test <test@example.com>',
+            )
+
+            with override_settings(LOCAL_REPO_MOUNT_PATH=mount_root):
+                response = self.client.post(
+                    '/api/projects/discover-source/',
+                    {'folder_name': 'ironforte-prowler'},
+                    format='json',
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(str(repo_dir), response.data['candidates'])
+
+    def test_discover_source_uses_host_home_when_mount_root_missing(self):
+        with tempfile.TemporaryDirectory() as host_home:
+            repo_dir = Path(host_home) / 'Freelance' / 'IronFort-Compliance' / 'ironforte-prowler'
+            repo_dir.mkdir(parents=True, exist_ok=True)
+            porcelain.init(str(repo_dir))
+            main_file = Path(repo_dir, 'main.py')
+            main_file.write_text('print("ok")\n')
+            porcelain.add(repo=str(repo_dir), paths=[str(main_file)])
+            porcelain.commit(
+                repo=str(repo_dir),
+                message=b'init',
+                author=b'Test <test@example.com>',
+                committer=b'Test <test@example.com>',
+            )
+
+            with override_settings(
+                LOCAL_REPO_MOUNT_PATH='/path/that/does/not/exist',
+                LOCAL_REPO_HOST_HOME=host_home,
+            ):
+                response = self.client.post(
+                    '/api/projects/discover-source/',
+                    {'folder_name': 'ironforte-prowler'},
+                    format='json',
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(str(repo_dir), response.data['candidates'])
+
+    def test_discover_source_accepts_git_marker_file(self):
+        with tempfile.TemporaryDirectory() as mount_root:
+            repo_dir = Path(mount_root) / 'Freelance' / 'IronFort-Compliance' / 'ironforte-www'
+            repo_dir.mkdir(parents=True, exist_ok=True)
+            # Worktree-style repositories can have .git as a file.
+            (repo_dir / '.git').write_text('gitdir: /tmp/example\n')
+            (repo_dir / 'README.md').write_text('# test\n')
+
+            with override_settings(LOCAL_REPO_MOUNT_PATH=mount_root):
+                response = self.client.post(
+                    '/api/projects/discover-source/',
+                    {'folder_name': 'ironforte-www'},
+                    format='json',
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn(str(repo_dir), response.data['candidates'])

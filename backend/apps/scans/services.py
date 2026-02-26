@@ -200,17 +200,22 @@ def discover_local_source_candidates(folder_name: str, max_results: int = 10, ma
     if not target_name:
         return []
 
-    mount_root = Path(str(getattr(settings, 'LOCAL_REPO_MOUNT_PATH', '') or '/host/home')).expanduser()
-    if not mount_root.exists() or not mount_root.is_dir():
-        return []
+    configured_mount_root = Path(str(getattr(settings, 'LOCAL_REPO_MOUNT_PATH', '') or '/host/home')).expanduser()
+    configured_host_home = str(getattr(settings, 'LOCAL_REPO_HOST_HOME', '') or '').strip()
+    default_home = Path.home().expanduser()
 
-    preferred_roots = []
-    for relative in ('personal-projects', 'projects', 'code', 'dev', 'workspace'):
-        candidate = mount_root / relative
-        if candidate.exists() and candidate.is_dir():
-            preferred_roots.append(candidate)
-    if not preferred_roots:
-        preferred_roots = [mount_root]
+    scan_roots: list[Path] = []
+    for candidate in (
+        configured_mount_root,
+        Path(configured_host_home).expanduser() if configured_host_home else None,
+        default_home,
+    ):
+        if candidate is None:
+            continue
+        if candidate.exists() and candidate.is_dir() and candidate not in scan_roots:
+            scan_roots.append(candidate)
+    if not scan_roots:
+        return []
 
     ignored_dirs = {
         '.git',
@@ -224,33 +229,41 @@ def discover_local_source_candidates(folder_name: str, max_results: int = 10, ma
     candidates: list[str] = []
     seen: set[str] = set()
 
-    for base_root in preferred_roots:
-        base_depth = len(base_root.parts)
-        for current_root, dirnames, filenames in os.walk(base_root, topdown=True):
-            current_path = Path(current_root)
-            depth = len(current_path.parts) - base_depth
-            if depth > max_depth:
-                dirnames[:] = []
-                continue
+    for scan_root in scan_roots:
+        preferred_roots: list[Path] = []
+        for relative in ('personal-projects', 'projects', 'code', 'dev', 'workspace'):
+            candidate = scan_root / relative
+            if candidate.exists() and candidate.is_dir() and candidate not in preferred_roots:
+                preferred_roots.append(candidate)
+        search_roots = preferred_roots + ([scan_root] if scan_root not in preferred_roots else [])
 
-            dirnames[:] = [name for name in dirnames if name not in ignored_dirs]
+        for base_root in search_roots:
+            base_depth = len(base_root.parts)
+            for current_root, dirnames, filenames in os.walk(base_root, topdown=True):
+                current_path = Path(current_root)
+                depth = len(current_path.parts) - base_depth
+                if depth > max_depth:
+                    dirnames[:] = []
+                    continue
 
-            if current_path.name == target_name and (current_path / '.git').is_dir():
-                value = str(current_path)
-                if value not in seen:
-                    seen.add(value)
-                    candidates.append(value)
-                    if len(candidates) >= max_results:
-                        return sorted(candidates)
+                dirnames[:] = [name for name in dirnames if name not in ignored_dirs]
 
-            zip_name = f'{target_name}.zip'
-            if zip_name in filenames:
-                zip_path = str(current_path / zip_name)
-                if zip_path not in seen:
-                    seen.add(zip_path)
-                    candidates.append(zip_path)
-                    if len(candidates) >= max_results:
-                        return sorted(candidates)
+                if current_path.name == target_name and (current_path / '.git').exists():
+                    value = str(current_path)
+                    if value not in seen:
+                        seen.add(value)
+                        candidates.append(value)
+                        if len(candidates) >= max_results:
+                            return sorted(candidates)
+
+                zip_name = f'{target_name}.zip'
+                if zip_name in filenames:
+                    zip_path = str(current_path / zip_name)
+                    if zip_path not in seen:
+                        seen.add(zip_path)
+                        candidates.append(zip_path)
+                        if len(candidates) >= max_results:
+                            return sorted(candidates)
 
     return sorted(candidates)
 

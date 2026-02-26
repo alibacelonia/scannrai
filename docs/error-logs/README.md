@@ -25,3 +25,5 @@ This folder tracks build/runtime incidents with:
 - [2026-02-26 finding snippet missing due premature workspace cleanup](./2026-02-26-scan-snippet-missing-workspace-retention-cleanup.md)
 - [2026-02-26 finding AI suggestion/fix not wired in scan detail modal](./2026-02-26-finding-ai-suggestion-ui-not-wired.md)
 - [2026-02-26 scan polling unauthorized and session drop while waiting](./2026-02-26-scan-polling-unauthorized-session-drop.md)
+- [2026-02-26 folder picker missed repos outside preferred roots](./2026-02-26-folder-picker-missed-nonpreferred-root.md)
+- [2026-02-26 folder picker missed repos with `.git` marker file](./2026-02-26-folder-picker-git-marker-file-mismatch.md)

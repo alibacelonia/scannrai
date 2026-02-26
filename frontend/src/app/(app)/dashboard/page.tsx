@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -80,6 +81,10 @@ function inferAbsoluteFolderPath(files: PickerFile[]): string | null {
   return null;
 }
 
+function isDuplicateRepoError(error: ApiError): boolean {
+  return error.status === 400 && error.message.toLowerCase().includes("already exists");
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const localFolderPickerRef = useRef<HTMLInputElement | null>(null);
@@ -96,6 +101,7 @@ export default function DashboardPage() {
   const [remoteOpening, setRemoteOpening] = useState(false);
   const [localOpening, setLocalOpening] = useState(false);
   const [localValidating, setLocalValidating] = useState(false);
+  const [feedbackDialog, setFeedbackDialog] = useState<{ title: string; description: string } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -136,8 +142,8 @@ export default function DashboardPage() {
   );
 
   const localPathHint = selectedLocalFolder
-    ? `/host/home/personal-projects/${selectedLocalFolder}`
-    : "/host/home/personal-projects/<repo-folder>";
+    ? `/host/home/.../${selectedLocalFolder}`
+    : "/host/home/.../repo, /Users/.../repo, or local .zip path";
 
   const validateLocalSource = useCallback(async (sourcePath: string): Promise<{
     kind: string;
@@ -163,7 +169,14 @@ export default function DashboardPage() {
       router.push(`/projects/${project.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        if (isDuplicateRepoError(err)) {
+          setFeedbackDialog({
+            title: "Repository already exists",
+            description: `${err.message} Open the existing repository from the list instead of creating another one.`,
+          });
+        } else {
+          setError(err.message);
+        }
       } else {
         setError("Unable to open repository.");
       }
@@ -192,7 +205,14 @@ export default function DashboardPage() {
       router.push(`/scans/${scan.id}`);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        if (isDuplicateRepoError(err)) {
+          setFeedbackDialog({
+            title: "Repository already exists",
+            description: `${err.message} Open the existing repository from the list instead of creating another one.`,
+          });
+        } else {
+          setError(err.message);
+        }
       } else {
         setError("Unable to open local repository.");
       }
@@ -214,7 +234,7 @@ export default function DashboardPage() {
 
     const firstRelativePath = getRelativePath(files[0]);
     const rootFolder = normalizeProjectName(firstRelativePath.split("/").filter(Boolean)[0] || files[0].name || "repository");
-    const fallbackHint = `/host/home/personal-projects/${rootFolder}`;
+    const fallbackHint = `/host/home/.../${rootFolder} or /Users/.../${rootFolder}`;
     setLocalSourceCandidates([]);
     setSelectedLocalFolder(rootFolder);
 
@@ -257,7 +277,7 @@ export default function DashboardPage() {
         }
         setLocalSourcePath("");
         setError(
-          `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full container-visible path manually (example: ${fallbackHint}).`,
+          `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full source path manually (example: ${fallbackHint}).`,
         );
       })
       .catch((err) => {
@@ -266,7 +286,7 @@ export default function DashboardPage() {
           setError(err.message);
         } else {
           setError(
-            `Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full container-visible path manually (example: ${fallbackHint}).`,
+            `Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full source path manually (example: ${fallbackHint}).`,
           );
         }
       })
@@ -317,7 +337,7 @@ export default function DashboardPage() {
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Local source path</label>
                 <Input
                   onChange={(event) => setLocalSourcePath(event.target.value)}
-                  placeholder={selectedLocalFolder ? localPathHint : "/host/home/.../repo or /host/home/.../repo.zip"}
+                  placeholder={selectedLocalFolder ? localPathHint : "/host/home/.../repo, /Users/.../repo, or /.../repo.zip"}
                   value={localSourcePath}
                 />
               </div>
@@ -435,6 +455,22 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Dialog open={Boolean(feedbackDialog)} onOpenChange={(open) => !open && setFeedbackDialog(null)}>
+        {feedbackDialog ? (
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{feedbackDialog.title}</DialogTitle>
+              <DialogDescription>{feedbackDialog.description}</DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end px-5 pb-5 pt-2">
+              <Button onClick={() => setFeedbackDialog(null)} size="sm" type="button">
+                Close
+              </Button>
+            </div>
+          </DialogContent>
+        ) : null}
+      </Dialog>
     </PageShell>
   );
 }
