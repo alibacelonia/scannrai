@@ -3,14 +3,34 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { FolderGit2, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Settings2, ShieldAlert, X } from "lucide-react";
-import { ScanSearch } from "lucide-react";
+import {
+  ChevronsUpDown,
+  FolderGit2,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ScanSearch,
+  Settings2,
+  Shield,
+  UserCircle2,
+  X,
+} from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { clearTokens } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_WIDTH_EXPANDED = 224;
-const SIDEBAR_WIDTH_COLLAPSED = 48;
+const SIDEBAR_WIDTH_COLLAPSED = 72;
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,9 +39,33 @@ const navItems = [
   { href: "/policy", label: "Policy", icon: Settings2 },
 ];
 
+const account = {
+  name: "scannrai",
+  email: "security@workspace.local",
+  initials: "SR",
+};
+
+function isActivePath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function Avatar({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-900 text-[11px] font-semibold text-white",
+        className,
+      )}
+    >
+      {account.initials}
+    </span>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -42,119 +86,174 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const currentSectionLabel = useMemo(() => {
+    if (pathname.startsWith("/policy")) return "Policy";
+    if (pathname.startsWith("/projects")) return "Repositories";
+    if (pathname.startsWith("/scans")) return "Scans";
+    return "Dashboard";
+  }, [pathname]);
+
   const logout = () => {
     clearTokens();
     setMobileDrawerOpen(false);
     router.push("/login");
   };
 
-  const sidebarWidthClass = desktopCollapsed ? "md:pl-12" : "md:pl-56";
-  const currentSectionLabel = useMemo(() => {
-    if (pathname.startsWith("/policy")) return "Policy";
-    if (pathname.startsWith("/projects/")) return "Repository";
-    if (pathname.startsWith("/projects")) return "Repositories";
-    if (pathname.startsWith("/scans/")) return "Scan";
-    if (pathname.startsWith("/scans")) return "Scans";
-    return "Dashboard";
-  }, [pathname]);
+  const contentPaddingLeft = desktopCollapsed ? "md:pl-[72px]" : "md:pl-56";
 
-  const renderNav = (compact = false) => (
-    <nav className="space-y-1">
+  const renderNav = (compact: boolean, closeMobileOnClick: boolean) => (
+    <nav className="space-y-1.5">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const active = pathname.startsWith(item.href);
+        const active = isActivePath(pathname, item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            onClick={() => setMobileDrawerOpen(false)}
+            onClick={() => {
+              if (closeMobileOnClick) {
+                setMobileDrawerOpen(false);
+              }
+            }}
             className={cn(
-              "group flex items-center rounded-xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-colors",
+              "group flex items-center rounded-xl px-3 py-2.5 text-[13px] transition",
               active
-                ? "bg-slate-900 text-white"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                ? "bg-white text-slate-900"
+                : "text-slate-700 hover:bg-slate-100",
               compact && "justify-center px-0",
             )}
+            title={compact ? item.label : undefined}
           >
-            <Icon className="h-4 w-4 shrink-0" />
-            {!compact ? <span className="ml-3">{item.label}</span> : <span className="sr-only">{item.label}</span>}
+            <div className="flex items-center gap-3">
+              <Icon className="h-4 w-4 shrink-0" />
+              {compact ? <span className="sr-only">{item.label}</span> : <span className="font-medium">{item.label}</span>}
+            </div>
           </Link>
         );
       })}
     </nav>
   );
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <aside
-        className="fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 bg-white transition-[width] duration-200 md:flex md:flex-col"
-        style={{ width: desktopCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
-      >
-        <div className={cn("flex h-14 items-center border-b border-slate-200 px-3", desktopCollapsed ? "justify-center" : "justify-between")}>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-slate-900" />
-            {!desktopCollapsed ? <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">ScannrAI</span> : null}
-          </div>
-          <button
-            aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn("rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900", desktopCollapsed && "hidden")}
-            onClick={() => setDesktopCollapsed((value) => !value)}
-            type="button"
-          >
-            <PanelLeftClose className="h-4 w-4" />
+  const accountMenu = (mode: "compact" | "expanded" | "mobile") => {
+    const triggerClass =
+      mode === "compact"
+        ? "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-800 hover:bg-slate-100"
+        : "flex w-full items-center gap-2 rounded-xl px-1.5 py-1.5 text-left hover:bg-slate-100";
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button aria-label="Open profile menu" className={triggerClass} type="button">
+            <Avatar className="h-8 w-8" />
+            {mode !== "compact" ? (
+              <>
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-semibold text-slate-900">{account.name}</p>
+                  <p className="truncate text-xs text-slate-500">{account.email}</p>
+                </div>
+                <ChevronsUpDown className="ml-auto h-4 w-4 text-slate-500" />
+              </>
+            ) : null}
           </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">{renderNav(desktopCollapsed)}</div>
-        <div className="border-t border-slate-200 p-2">
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-64"
+          side="right"
+          sideOffset={8}
+        >
+          <DropdownMenuLabel className="normal-case">
+            <div className="flex items-center gap-2">
+              <Avatar className="h-9 w-9" />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900">{account.name}</p>
+                <p className="truncate text-xs text-slate-500">{account.email}</p>
+              </div>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link className="cursor-pointer" href="/profile" onClick={() => setMobileDrawerOpen(false)}>
+              <UserCircle2 className="mr-2 h-4 w-4" />
+              Account
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-red-700 focus:bg-red-50 focus:text-red-800"
+            onSelect={(event) => {
+              event.preventDefault();
+              logout();
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Log out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  const sidebar = (
+    <>
+      <div className={cn("border-b border-slate-200 p-3", desktopCollapsed ? "px-2" : "px-3")}>
+        <div className={cn("flex p-1", desktopCollapsed ? "justify-center" : "items-center justify-between")}>
+          {!desktopCollapsed ? (
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                <Shield className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[13px] font-semibold text-slate-900">ScannrAI</p>
+                <p className="text-xs text-slate-500">Enterprise</p>
+              </div>
+            </div>
+          ) : null}
           <button
             aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "flex w-full items-center rounded-lg px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 hover:bg-slate-100 hover:text-slate-900",
-              desktopCollapsed && "justify-center px-0",
-            )}
-            onClick={() => setDesktopCollapsed((value) => !value)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+            onClick={() => setDesktopCollapsed((prev) => !prev)}
             type="button"
           >
             {desktopCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            {!desktopCollapsed ? <span className="ml-2">Collapse</span> : null}
           </button>
         </div>
+      </div>
+
+      <div className="no-scrollbar flex-1 overflow-y-auto p-2.5">
+        {!desktopCollapsed ? <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Workspace</p> : null}
+        {renderNav(desktopCollapsed, false)}
+      </div>
+
+      <div className="border-t border-slate-200 p-2.5">
+        <div className={cn(desktopCollapsed ? "flex items-center justify-center" : "")}>{accountMenu(desktopCollapsed ? "compact" : "expanded")}</div>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen text-[var(--ink)]">
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 bg-[#f8f8f8] transition-[width] duration-200 md:flex md:flex-col"
+        style={{ width: desktopCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
+      >
+        {sidebar}
       </aside>
 
       <button
         aria-controls="mobile-nav-drawer"
         aria-expanded={mobileDrawerOpen}
         aria-label={mobileDrawerOpen ? "Close navigation menu" : "Open navigation menu"}
-        className="fixed right-4 top-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300 bg-white shadow-sm md:hidden"
-        onClick={() => setMobileDrawerOpen((value) => !value)}
+        className="fixed left-4 top-4 z-50 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-white/90 text-[var(--ink)] shadow-md backdrop-blur md:hidden"
+        onClick={() => setMobileDrawerOpen((prev) => !prev)}
         type="button"
       >
-        <span className="relative h-4 w-5">
-          <span
-            className={cn(
-              "absolute left-0 top-1/2 h-0.5 w-5 -translate-y-1.5 bg-slate-900 transition-transform duration-200",
-              mobileDrawerOpen && "translate-y-0 rotate-45",
-            )}
-          />
-          <span
-            className={cn(
-              "absolute left-0 top-1/2 h-0.5 w-5 -translate-y-1/2 bg-slate-900 transition-opacity duration-200",
-              mobileDrawerOpen && "opacity-0",
-            )}
-          />
-          <span
-            className={cn(
-              "absolute left-0 top-1/2 h-0.5 w-5 translate-y-0.5 bg-slate-900 transition-transform duration-200",
-              mobileDrawerOpen && "-translate-y-0 rotate-[-45deg]",
-            )}
-          />
-        </span>
+        {mobileDrawerOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
 
       <button
         aria-hidden={!mobileDrawerOpen}
         className={cn(
-          "fixed inset-0 z-40 bg-slate-900/40 transition-opacity md:hidden",
+          "fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] transition-opacity md:hidden",
           mobileDrawerOpen ? "opacity-100" : "pointer-events-none opacity-0",
         )}
         onClick={() => setMobileDrawerOpen(false)}
@@ -166,55 +265,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Mobile navigation"
         aria-modal="true"
         className={cn(
-          "fixed inset-y-0 right-0 z-50 w-72 border-l border-slate-200 bg-white p-4 shadow-2xl transition-transform md:hidden",
-          mobileDrawerOpen ? "translate-x-0" : "translate-x-full",
+          "fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 bg-[#f8f8f8] p-0 shadow-2xl transition-transform md:hidden",
+          mobileDrawerOpen ? "translate-x-0" : "-translate-x-full",
         )}
         id="mobile-nav-drawer"
         role="dialog"
       >
-        <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-4 w-4 text-slate-900" />
-            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">ScannrAI</span>
+        <div className="flex h-full flex-col">
+          <div className="border-b border-slate-200 p-3">
+            <div className="flex items-center justify-between p-1">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                  <Shield className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-900">ScannrAI</p>
+                  <p className="text-xs text-slate-500">Enterprise</p>
+                </div>
+              </div>
+              <button
+                aria-label="Close navigation menu"
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                onClick={() => setMobileDrawerOpen(false)}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          <button
-            aria-label="Close navigation menu"
-            className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-            onClick={() => setMobileDrawerOpen(false)}
-            type="button"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        {renderNav(false)}
-        <div className="mt-4 border-t border-slate-200 pt-3">
-          <button
-            className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-slate-800"
-            onClick={logout}
-            type="button"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </button>
+
+          <div className="no-scrollbar flex-1 overflow-y-auto p-2.5">
+            <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Workspace</p>
+            {renderNav(false, true)}
+          </div>
+
+          <div className="border-t border-slate-200 p-2.5">{accountMenu("mobile")}</div>
         </div>
       </aside>
 
-      <div className={cn("min-h-screen transition-[padding-left] duration-200", sidebarWidthClass)}>
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50/95 backdrop-blur">
-          <div className="px-4 py-3 sm:px-6 md:py-4">
+      <div className={cn("min-h-screen transition-[padding-left] duration-200", contentPaddingLeft)}>
+        <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-white/85 backdrop-blur">
+          <div className="px-4 py-3 sm:px-6">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Authenticated Area</p>
-                <p className="text-xs text-slate-700">{currentSectionLabel}</p>
+              <div className="pl-12 md:pl-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">Authenticated Area</p>
+                <p className="text-xs text-[var(--ink-muted)]">{currentSectionLabel}</p>
               </div>
-              <button
-                className="hidden items-center rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-white hover:bg-slate-800 md:inline-flex"
-                onClick={logout}
-                type="button"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </button>
             </div>
           </div>
         </header>
@@ -224,12 +320,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer
         className={cn(
-          "fixed bottom-0 right-0 z-20 hidden items-center justify-between border-t border-slate-200 bg-slate-50/100 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 backdrop-blur md:flex",
-          desktopCollapsed ? "left-12" : "left-56",
+          "fixed bottom-0 right-0 z-20 hidden items-center justify-between border-t border-[var(--border)] bg-white/95 px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ink-subtle)] backdrop-blur md:flex",
+          desktopCollapsed ? "left-[72px]" : "left-56",
         )}
       >
         <span>Local scan paths must be container-visible</span>
-        <span className="text-slate-400">/host/home/...</span>
+        <span className="text-slate-400">/host/home/... or /Users/...</span>
       </footer>
     </div>
   );

@@ -1,17 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --surface: #f8fafc;
+  --bg: #f4f7fb;
+  --bg-elevated: #ffffff;
+  --bg-muted: #eef3f9;
   --ink: #0f172a;
-  --ink-muted: #475569;
-  --brand-100: #e2e8f0;
-  --brand-400: #64748b;
-  --brand-600: #0f172a;
-  --brand-700: #020617;
-  --muted: #f1f5f9;
-  --muted-strong: #e2e8f0;
-  --border: #e2e8f0;
+  --ink-muted: #4b5563;
+  --ink-subtle: #64748b;
+  --border: #d7dee8;
+  --border-strong: #c4cedb;
+  --ring: #1e293b;
+  --primary: #0f172a;
+  --primary-ink: #ffffff;
+  --success: #166534;
+  --warning: #9a3412;
   --danger: #b91c1c;
+  --chip: #e2e8f0;
+  --sidebar: #0f172a;
+  --sidebar-ink: #e2e8f0;
 }
 
 * {
@@ -26,17 +32,39 @@ body {
 }
 
 body {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(148, 163, 184, 0.24), transparent 38%),
+    radial-gradient(circle at 100% 100%, rgba(30, 41, 59, 0.1), transparent 35%),
+    var(--bg);
   color: var(--ink);
-  background: var(--surface);
-  font-family: var(--font-body), "IBM Plex Mono", monospace;
+  font-family: var(--font-body), "Segoe UI", sans-serif;
   font-size: 13px;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-heading), "Space Grotesk", sans-serif;
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

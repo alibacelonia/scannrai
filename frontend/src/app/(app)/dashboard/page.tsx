@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FolderGit2, GitBranch, Laptop, Loader2, PlayCircle, RefreshCw, ScanSearch, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageShell } from "@/components/page-shell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +27,11 @@ type PickerFile = File & {
   webkitRelativePath?: string;
   path?: string;
 };
+
+type BannerState = {
+  tone: "error" | "info";
+  message: string;
+} | null;
 
 function normalizeProjectName(candidate: string): string {
   const trimmed = candidate.trim();
@@ -85,6 +91,29 @@ function isDuplicateRepoError(error: ApiError): boolean {
   return error.status === 400 && error.message.toLowerCase().includes("already exists");
 }
 
+function formatDateTime(value: string | null): string {
+  if (!value) {
+    return "No activity yet";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown time";
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function mapStatusVariant(status: Scan["status"]): "default" | "success" | "warning" | "danger" {
+  if (status === "completed") return "success";
+  if (status === "running") return "warning";
+  if (status === "failed") return "danger";
+  return "default";
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const localFolderPickerRef = useRef<HTMLInputElement | null>(null);
@@ -92,7 +121,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectScans, setProjectScans] = useState<Record<number, Scan[]>>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [banner, setBanner] = useState<BannerState>(null);
 
   const [remoteRepoUrl, setRemoteRepoUrl] = useState("");
   const [localSourcePath, setLocalSourcePath] = useState("");
@@ -101,12 +130,13 @@ export default function DashboardPage() {
   const [remoteOpening, setRemoteOpening] = useState(false);
   const [localOpening, setLocalOpening] = useState(false);
   const [localValidating, setLocalValidating] = useState(false);
+  const [startingProjectId, setStartingProjectId] = useState<number | null>(null);
   const [feedbackDialog, setFeedbackDialog] = useState<{ title: string; description: string } | null>(null);
   const [folderPickerDialogOpen, setFolderPickerDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setBanner(null);
     try {
       const projectPage = await listProjects();
       setProjects(projectPage.results);
@@ -120,9 +150,9 @@ export default function DashboardPage() {
       setProjectScans(Object.fromEntries(scansEntries));
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setBanner({ tone: "error", message: err.message });
       } else {
-        setError("Unable to load dashboard.");
+        setBanner({ tone: "error", message: "Unable to load dashboard." });
       }
     } finally {
       setLoading(false);
@@ -133,29 +163,53 @@ export default function DashboardPage() {
     void loadData();
   }, [loadData]);
 
+  const allScans = useMemo(() => Object.values(projectScans).flat(), [projectScans]);
+
   const recentScans = useMemo(
-    () =>
-      Object.values(projectScans)
-        .flat()
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 6),
-    [projectScans],
+    () => allScans.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8),
+    [allScans],
   );
+
+  const projectRows = useMemo(
+    () =>
+      projects.map((project) => {
+        const scans = (projectScans[project.id] ?? []).slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        return {
+          project,
+          scanCount: scans.length,
+          latestScan: scans[0] ?? null,
+        };
+      }),
+    [projects, projectScans],
+  );
+
+  const summary = useMemo(() => {
+    const running = allScans.filter((scan) => scan.status === "running" || scan.status === "queued").length;
+    const completed = allScans.filter((scan) => scan.status === "completed").length;
+    const failed = allScans.filter((scan) => scan.status === "failed").length;
+    return {
+      repositories: projects.length,
+      scans: allScans.length,
+      running,
+      completed,
+      failed,
+    };
+  }, [allScans, projects.length]);
+
+  const projectNameById = useMemo(() => {
+    return Object.fromEntries(projects.map((project) => [project.id, project.name]));
+  }, [projects]);
 
   const localPathHint = selectedLocalFolder
     ? `/host/home/.../${selectedLocalFolder}`
     : "/host/home/.../repo, /Users/.../repo, or local .zip path";
 
-  const validateLocalSource = useCallback(async (sourcePath: string): Promise<{
-    kind: string;
-    sourceToSave: string;
-  }> => {
+  const validateLocalSource = useCallback(async (sourcePath: string): Promise<{ sourceToSave: string }> => {
     const validation = await validateRepositorySource(sourcePath);
     if (validation.kind !== "local_git" && validation.kind !== "local_zip") {
       throw new ApiError("Selected source must be a local git repository folder or local .zip path.", 400);
     }
     return {
-      kind: validation.kind,
       sourceToSave: validation.resolved_path ?? sourcePath,
     };
   }, []);
@@ -163,7 +217,7 @@ export default function DashboardPage() {
   const openRemoteRepository = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRemoteOpening(true);
-    setError(null);
+    setBanner(null);
     try {
       const project = await createProject(deriveNameFromRepoUrl(remoteRepoUrl), remoteRepoUrl.trim());
       setRemoteRepoUrl("");
@@ -176,10 +230,10 @@ export default function DashboardPage() {
             description: `${err.message} Open the existing repository from the list instead of creating another one.`,
           });
         } else {
-          setError(err.message);
+          setBanner({ tone: "error", message: err.message });
         }
       } else {
-        setError("Unable to open repository.");
+        setBanner({ tone: "error", message: "Unable to open repository." });
       }
     } finally {
       setRemoteOpening(false);
@@ -189,12 +243,12 @@ export default function DashboardPage() {
   const openLocalRepository = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!localSourcePath.trim()) {
-      setError("Enter a local repository path first.");
+      setBanner({ tone: "error", message: "Enter a local repository path first." });
       return;
     }
 
     setLocalOpening(true);
-    setError(null);
+    setBanner(null);
     try {
       const source = localSourcePath.trim();
       const { sourceToSave } = await validateLocalSource(source);
@@ -212,10 +266,10 @@ export default function DashboardPage() {
             description: `${err.message} Open the existing repository from the list instead of creating another one.`,
           });
         } else {
-          setError(err.message);
+          setBanner({ tone: "error", message: err.message });
         }
       } else {
-        setError("Unable to open local repository.");
+        setBanner({ tone: "error", message: "Unable to open local repository." });
       }
     } finally {
       setLocalOpening(false);
@@ -231,28 +285,30 @@ export default function DashboardPage() {
       .then((result) => {
         if (result.candidates.length === 1) {
           setLocalSourcePath(result.candidates[0]);
-          setError(`Resolved local source path automatically: ${result.candidates[0]}`);
+          setBanner({ tone: "info", message: `Resolved local source path automatically: ${result.candidates[0]}` });
           return;
         }
         if (result.candidates.length > 1) {
           setLocalSourceCandidates(result.candidates);
           setLocalSourcePath(result.candidates[0]);
-          setError("Multiple matching local sources found. Choose the correct path below.");
+          setBanner({ tone: "info", message: "Multiple matching local sources found. Choose the correct path below." });
           return;
         }
         setLocalSourcePath("");
-        setError(
-          `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full source path manually (example: ${fallbackHint}).`,
-        );
+        setBanner({
+          tone: "error",
+          message: `Folder "${rootFolder}" selected, but browser did not expose absolute path and no matches were auto-discovered. Enter full source path manually (example: ${fallbackHint}).`,
+        });
       })
       .catch((err) => {
         setLocalSourcePath("");
         if (err instanceof ApiError) {
-          setError(err.message);
+          setBanner({ tone: "error", message: err.message });
         } else {
-          setError(
-            `Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full source path manually (example: ${fallbackHint}).`,
-          );
+          setBanner({
+            tone: "error",
+            message: `Folder "${rootFolder}" selected, but browser did not expose absolute path. Enter full source path manually (example: ${fallbackHint}).`,
+          });
         }
       })
       .finally(() => setLocalValidating(false));
@@ -282,12 +338,12 @@ export default function DashboardPage() {
       setLocalSourcePath(inferredAbsolutePath);
       setLocalValidating(true);
       void validateLocalSource(inferredAbsolutePath)
-        .then(() => setError(null))
+        .then(() => setBanner({ tone: "info", message: `Selected folder resolved to: ${inferredAbsolutePath}` }))
         .catch((err) => {
           if (err instanceof ApiError) {
-            setError(err.message);
+            setBanner({ tone: "error", message: err.message });
           } else {
-            setError("Selected folder is not a valid repository source.");
+            setBanner({ tone: "error", message: "Selected folder is not a valid repository source." });
           }
         })
         .finally(() => setLocalValidating(false));
@@ -296,10 +352,27 @@ export default function DashboardPage() {
 
     const hasDirectoryStructure = files.some((file) => getRelativePath(file).includes("/"));
     if (!hasDirectoryStructure) {
-      setError("Could not determine folder path from selection. Paste the local repository path manually.");
+      setBanner({ tone: "error", message: "Could not determine folder path from selection. Paste the local repository path manually." });
       return;
     }
     discoverFromSelectedFolderName(rootFolder);
+  };
+
+  const runScanForProject = async (projectId: number) => {
+    setStartingProjectId(projectId);
+    setBanner(null);
+    try {
+      const scan = await createScan(String(projectId));
+      router.push(`/scans/${scan.id}`);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setBanner({ tone: "error", message: err.message });
+      } else {
+        setBanner({ tone: "error", message: "Unable to start scan." });
+      }
+    } finally {
+      setStartingProjectId(null);
+    }
   };
 
   if (loading) {
@@ -309,16 +382,82 @@ export default function DashboardPage() {
   return (
     <PageShell
       eyebrow="Workspace"
-      title="Repository Dashboard"
-      description="Open a remote repository or resolve a local source path for background scans."
+      title="Dashboard"
+      description="Manage repositories and trigger background scans from remote URLs or local repository paths."
+      actions={
+        <Button onClick={() => void loadData()} size="sm" type="button" variant="outline">
+          <RefreshCw className="mr-2 h-3.5 w-3.5" />
+          Refresh
+        </Button>
+      }
     >
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <Card className="rounded-2xl border-slate-300 bg-gradient-to-br from-white to-slate-50/80">
+          <CardHeader className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Security Operations</p>
+                <CardTitle className="text-lg">Repository scanning control center</CardTitle>
+                <CardDescription>Track scanner throughput and jump into repositories with one click.</CardDescription>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 shadow-sm">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <StatTile icon={FolderGit2} label="Repositories" value={summary.repositories} />
+              <StatTile icon={ScanSearch} label="Total scans" value={summary.scans} />
+              <StatTile icon={ShieldCheck} label="Completed" value={summary.completed} />
+              <StatTile icon={ShieldX} label="Failed" value={summary.failed} />
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-2xl">
           <CardHeader>
-            <CardTitle>Open Repository</CardTitle>
+            <CardTitle className="text-sm">Live pipeline</CardTitle>
+            <CardDescription>Current queue and execution health.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="grid gap-2 md:grid-cols-[1fr_auto]" onSubmit={openRemoteRepository}>
+          <CardContent className="space-y-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active scans</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900">{summary.running}</p>
+              <p className="mt-1 text-[11px] text-slate-600">Queued and running scans across all repositories.</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Last activity</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateTime(recentScans[0]?.created_at ?? null)}</p>
+              <p className="mt-1 text-[11px] text-slate-600">Most recent scan creation timestamp.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      {banner ? (
+        <div
+          className={
+            banner.tone === "error"
+              ? "rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-medium text-red-700"
+              : "rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-700"
+          }
+        >
+          {banner.message}
+        </div>
+      ) : null}
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Open Remote Repository
+            </CardTitle>
+            <CardDescription>Connect a public Git URL and start tracking scans.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-3" onSubmit={openRemoteRepository}>
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Remote URL</label>
                 <Input
@@ -327,21 +466,39 @@ export default function DashboardPage() {
                   value={remoteRepoUrl}
                 />
               </div>
-              <Button className="self-end" disabled={remoteOpening || !remoteRepoUrl.trim()} type="submit">
-                {remoteOpening ? "Opening..." : "Open remote"}
+              <Button className="w-full" disabled={remoteOpening || !remoteRepoUrl.trim()} type="submit">
+                {remoteOpening ? (
+                  <>
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    Opening...
+                  </>
+                ) : (
+                  "Open remote"
+                )}
               </Button>
             </form>
+          </CardContent>
+        </Card>
 
-            <form className="grid gap-2 md:grid-cols-[1fr_auto_auto]" onSubmit={openLocalRepository}>
-              <input
-                className="hidden"
-                ref={localFolderPickerRef}
-                type="file"
-                multiple
-                webkitdirectory=""
-                directory=""
-                onChange={handleLocalFolderSelection}
-              />
+        <Card className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Laptop className="h-4 w-4" />
+              Open Local Repository
+            </CardTitle>
+            <CardDescription>Pick a folder or paste a container-visible local path.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <input
+              className="hidden"
+              ref={localFolderPickerRef}
+              type="file"
+              multiple
+              webkitdirectory=""
+              directory=""
+              onChange={handleLocalFolderSelection}
+            />
+            <form className="space-y-3" onSubmit={openLocalRepository}>
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Local source path</label>
                 <Input
@@ -350,19 +507,32 @@ export default function DashboardPage() {
                   value={localSourcePath}
                 />
               </div>
-              <Button className="self-end" onClick={chooseLocalRepositoryFolder} type="button" variant="outline">
-                Select folder
-              </Button>
-              <Button className="self-end" disabled={localOpening || localValidating || !localSourcePath.trim()} type="submit">
-                {localValidating ? "Validating..." : localOpening ? "Opening..." : "Open local"}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button onClick={chooseLocalRepositoryFolder} type="button" variant="outline">
+                  Select folder
+                </Button>
+                <Button className="w-full" disabled={localOpening || localValidating || !localSourcePath.trim()} type="submit">
+                  {localValidating ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Validating...
+                    </>
+                  ) : localOpening ? (
+                    <>
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      Opening...
+                    </>
+                  ) : (
+                    "Open local"
+                  )}
+                </Button>
+              </div>
             </form>
-
-            <p className="text-xs text-slate-500">
-              Local source is path-based. Use a git repository folder path or local .zip path accessible to backend/worker.
+            <p className="text-[11px] text-slate-500">
+              Local source is path-based and validated before opening. Use a git repository folder path or a local .zip path.
             </p>
             {selectedLocalFolder ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-[11px] text-slate-500">
                 Selected folder: <span className="font-semibold text-slate-900">{selectedLocalFolder}</span>
               </p>
             ) : null}
@@ -373,9 +543,10 @@ export default function DashboardPage() {
                   {localSourceCandidates.map((candidate) => (
                     <Button
                       key={candidate}
+                      className="h-auto w-full justify-start px-3 py-2 text-left text-[11px] normal-case tracking-normal"
                       onClick={() => {
                         setLocalSourcePath(candidate);
-                        setError(null);
+                        setBanner(null);
                       }}
                       size="sm"
                       type="button"
@@ -387,23 +558,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             ) : null}
-            {error ? <p className="text-xs font-medium text-red-700">{error}</p> : null}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Snapshot</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs text-slate-600">
-            <div className="rounded-xl bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Repositories</p>
-              <p className="mt-1 text-base font-semibold text-slate-900">{projects.length}</p>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Recent scans</p>
-              <p className="mt-1 text-base font-semibold text-slate-900">{recentScans.length}</p>
-            </div>
           </CardContent>
         </Card>
       </section>
@@ -412,53 +566,65 @@ export default function DashboardPage() {
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Repositories</CardTitle>
+            <CardDescription>Open details or start a new scan from any repository.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {projects.length === 0 ? <p className="text-xs text-slate-500">No repositories yet.</p> : null}
-            <div className="space-y-2">
-              {projects.map((project) => (
-                <Link
-                  className="block rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100"
-                  href={`/projects/${project.id}`}
-                  key={project.id}
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">{project.name}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">{project.repo_url || "No repository source configured"}</p>
-                </Link>
-              ))}
-            </div>
+          <CardContent className="space-y-2">
+            {projectRows.length === 0 ? <p className="text-xs text-slate-500">No repositories yet.</p> : null}
+            {projectRows.map(({ project, scanCount, latestScan }) => (
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3" key={project.id}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <Link className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900 hover:text-slate-700" href={`/projects/${project.id}`}>
+                      {project.name}
+                    </Link>
+                    <p className="text-[11px] text-slate-500 break-all">{project.repo_url || "No repository source configured"}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {scanCount} scan{scanCount === 1 ? "" : "s"} • Last: {formatDateTime(latestScan?.created_at ?? null)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {latestScan ? <Badge variant={mapStatusVariant(latestScan.status)}>{latestScan.status}</Badge> : null}
+                    <Button
+                      className="h-8 px-2.5"
+                      disabled={startingProjectId === project.id}
+                      onClick={() => void runScanForProject(project.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {startingProjectId === project.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <>
+                          <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+                          Run scan
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
         <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle>Recent Scans</CardTitle>
+            <CardDescription>Latest scans across all repositories.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {recentScans.length === 0 ? <p className="text-xs text-slate-500">No scans yet.</p> : null}
             {recentScans.map((scan) => (
-              <Link
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100"
-                href={`/scans/${scan.id}`}
-                key={scan.id}
-              >
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">Scan #{scan.id}</p>
-                  <p className="mt-1 text-[11px] text-slate-500">Project #{scan.project}</p>
+              <Link className="block rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100" href={`/scans/${scan.id}`} key={scan.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">Scan #{scan.id}</p>
+                    <p className="text-[11px] text-slate-500">{projectNameById[scan.project] ?? `Project #${scan.project}`}</p>
+                    <p className="text-[11px] text-slate-500">Created {formatDateTime(scan.created_at)}</p>
+                  </div>
+                  <Badge variant={mapStatusVariant(scan.status)}>{scan.status}</Badge>
                 </div>
-                <Badge
-                  variant={
-                    scan.status === "completed"
-                      ? "success"
-                      : scan.status === "failed"
-                        ? "danger"
-                        : scan.status === "running"
-                          ? "warning"
-                          : "default"
-                  }
-                >
-                  {scan.status}
-                </Badge>
               </Link>
             ))}
           </CardContent>
@@ -507,36 +673,72 @@ export default function DashboardPage() {
 function DashboardSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <Skeleton className="h-3 w-28" />
-        <Skeleton className="mt-3 h-7 w-56" />
-        <Skeleton className="mt-2 h-4 w-80 max-w-full" />
-      </div>
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-          <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-9 w-full" />
-          <Skeleton className="h-9 w-full" />
-          <Skeleton className="h-3 w-64" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="mt-3 h-7 w-72 max-w-full" />
+          <Skeleton className="mt-2 h-4 w-80 max-w-full" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
         </div>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-          <Skeleton className="h-3 w-28" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
+          <Skeleton className="h-4 w-36" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
         </div>
       </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-2">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+        <Icon className="h-4 w-4 text-slate-500" />
+      </div>
+      <p className="mt-2 text-lg font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

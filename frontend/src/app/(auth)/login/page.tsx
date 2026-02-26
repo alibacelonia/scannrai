@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
+import { ArrowRight, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,35 +48,49 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--surface)] p-4">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_center,_#fde68a_0,_transparent_35%),radial-gradient(circle_at_bottom_right,_#c7d2fe_0,_transparent_35%)]" />
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Welcome back</CardTitle>
-          <CardDescription>Sign in to run scans and review findings.</CardDescription>
+    <div className="relative flex min-h-screen items-center justify-center p-4">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(15,23,42,0.2),transparent_36%),radial-gradient(circle_at_100%_100%,rgba(148,163,184,0.35),transparent_42%)]" />
+      <Card className="relative w-full max-w-md">
+        <CardHeader className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">ScannrAI</p>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <ShieldCheck className="h-5 w-5 text-slate-700" />
+            Sign in
+          </CardTitle>
+          <CardDescription>Access repositories, run scans, and review findings.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={onSubmit}>
-            <Input
-              autoComplete="username"
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="Username"
-              value={username}
-            />
-            <Input
-              autoComplete="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password"
-              type="password"
-              value={password}
-            />
-            {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Username</label>
+              <Input
+                autoComplete="username"
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="your-username"
+                value={username}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Password</label>
+              <Input
+                autoComplete="current-password"
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter password"
+                type="password"
+                value={password}
+              />
+            </div>
+            {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Signing in..." : "Sign in"}
+              {!loading ? <ArrowRight className="ml-2 h-3.5 w-3.5" /> : null}
             </Button>
           </form>
-          <p className="mt-4 text-sm text-[var(--ink-muted)]">
-            Need an account? <Link className="text-[var(--brand-700)]" href="/register">Create one</Link>
+          <p className="mt-4 text-xs text-[var(--ink-muted)]">
+            Need an account?{" "}
+            <Link className="font-semibold text-[var(--ink)] hover:underline" href="/register">
+              Create one
+            </Link>
           </p>
         </CardContent>
       </Card>

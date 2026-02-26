@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
 
-const headingFont = Space_Grotesk({
-  variable: "--font-heading",
+const bodyFont = Geist({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
-const bodyFont = IBM_Plex_Mono({
-  variable: "--font-body",
+const monoFont = Geist_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${headingFont.variable} ${bodyFont.variable} antialiased`}>{children}</body>
+      <body className={`${bodyFont.variable} ${monoFont.variable} antialiased`}>{children}</body>
     </html>
   );
 }
