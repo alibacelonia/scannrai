@@ -1,6 +1,9 @@
 .env
 *.env.example
-docs/
+docs/*
+!docs/deploy/
+docs/deploy/*
+!docs/deploy/lightsail.md
 markdowns/
 .venv/
 venv/
