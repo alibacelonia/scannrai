@@ -1,14 +1,19 @@
+from django.conf import settings
 from django.http import HttpResponse
-from rest_framework import mixins, permissions, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.views import APIView
 from rest_framework.response import Response
 
 from apps.findings.serializers import FindingSerializer
 from apps.scans.ai import REVIEW_WARNING, build_scan_summary
+from apps.scans.audit import record_audit_event
 from apps.scans.exporters import build_scan_export_json, build_scan_export_markdown
+from apps.scans.models import AuditEventType
+from apps.scans.policy import get_or_create_policy_for_user
 
 from .models import Scan
-from .serializers import ScanSerializer
+from .serializers import PolicySerializer, ScanSerializer
 
 
 class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -47,6 +52,8 @@ class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], url_path='ai/summary')
     def ai_summary(self, request, pk=None):
+        if not settings.AI_FEATURE_ENABLED:
+            return Response({'detail': 'AI enrichment is not enabled for this environment.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         scan = self.get_object()
         summary = build_scan_summary(scan)
         scan.ai_summary = summary
@@ -57,12 +64,55 @@ class ScanViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     def export_json(self, request, pk=None):
         scan = self.get_object()
         payload = build_scan_export_json(scan)
+        record_audit_event(
+            scan=scan,
+            event_type=AuditEventType.EXPORT_JSON_DOWNLOADED,
+            user=request.user,
+            message='Scan JSON export downloaded.',
+        )
         return Response(payload)
 
     @action(detail=True, methods=['get'], url_path=r'export\.md')
     def export_markdown(self, request, pk=None):
         scan = self.get_object()
         markdown = build_scan_export_markdown(scan)
+        record_audit_event(
+            scan=scan,
+            event_type=AuditEventType.EXPORT_MD_DOWNLOADED,
+            user=request.user,
+            message='Scan Markdown export downloaded.',
+        )
         response = HttpResponse(markdown, content_type='text/markdown')
         response['Content-Disposition'] = f'attachment; filename=\"scan-{scan.id}.md\"'
         return response
+
+
+class PolicyView(APIView):
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request):
+        policy = get_or_create_policy_for_user(request.user)
+        serializer = PolicySerializer(policy)
+        return Response(serializer.data)
+
+    def put(self, request):
+        policy = get_or_create_policy_for_user(request.user)
+        serializer = PolicySerializer(policy, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        # We do not have a direct scan entity for policy updates; write generic audit row.
+        from apps.scans.models import AuditLog
+
+        AuditLog.objects.create(
+            actor=request.user,
+            action=AuditEventType.POLICY_UPDATED,
+            entity_type='policy',
+            entity_id=str(policy.id),
+            metadata={'updated_fields': sorted(serializer.validated_data.keys())},
+            user=request.user,
+            event_type=AuditEventType.POLICY_UPDATED,
+            message='Policy updated.',
+            meta={'updated_fields': sorted(serializer.validated_data.keys())},
+        )
+        return Response(PolicySerializer(policy).data)

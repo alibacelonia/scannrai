@@ -2,10 +2,14 @@ from pathlib import Path
 
 from rest_framework import serializers
 
+from apps.scans.security import redact_object, redact_text
+
 from .models import Finding
 
 
 class FindingSerializer(serializers.ModelSerializer):
+    raw = serializers.SerializerMethodField()
+
     class Meta:
         model = Finding
         fields = (
@@ -14,9 +18,12 @@ class FindingSerializer(serializers.ModelSerializer):
             'tool',
             'severity',
             'category',
+            'title',
+            'description',
             'file_path',
             'line_start',
             'line_end',
+            'references',
             'raw',
             'fingerprint',
             'ai_explanation',
@@ -26,6 +33,9 @@ class FindingSerializer(serializers.ModelSerializer):
             'created_at',
         )
         read_only_fields = ('id', 'created_at')
+
+    def get_raw(self, obj: Finding):
+        return redact_object(obj.raw)
 
 
 class FindingDetailSerializer(FindingSerializer):
@@ -67,7 +77,7 @@ class FindingDetailSerializer(FindingSerializer):
             rows.append(
                 {
                     'line_number': line_number,
-                    'content': content_lines[line_number - 1],
+                    'content': redact_text(content_lines[line_number - 1]),
                     'highlighted': bool(highlight_start and highlight_end and highlight_start <= line_number <= highlight_end),
                 }
             )

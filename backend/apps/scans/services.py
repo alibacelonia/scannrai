@@ -2,6 +2,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -13,10 +14,15 @@ from dulwich import porcelain
 from dulwich.repo import Repo
 
 from .models import Scan
+from .security import stable_json_hash
 
 
 def _workspace_dir(scan_id: int) -> Path:
     return Path(settings.SCAN_WORKDIR) / str(scan_id)
+
+
+def _shared_upload_dir() -> Path:
+    return Path(settings.SCAN_SHARED_UPLOAD_DIR)
 
 
 def _repo_dir(scan_id: int) -> Path:
@@ -41,24 +47,42 @@ def _safe_extract_zip(zip_path: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     destination_root = destination.resolve()
     with zipfile.ZipFile(zip_path, 'r') as archive:
+        max_file_count = int(getattr(settings, 'SCAN_ZIP_MAX_FILES', 20000))
+        max_uncompressed_bytes = int(getattr(settings, 'SCAN_ZIP_MAX_BYTES', 500 * 1024 * 1024))
+        if len(archive.infolist()) > max_file_count:
+            raise ValueError(f'Zip archive has too many files (limit: {max_file_count}).')
+
+        total_size = 0
         for member in archive.infolist():
             extracted_path = (destination / member.filename).resolve()
             if extracted_path != destination_root and destination_root not in extracted_path.parents:
                 raise ValueError('Zip archive contains invalid paths.')
+            total_size += int(member.file_size or 0)
+            if total_size > max_uncompressed_bytes:
+                raise ValueError(
+                    'Zip archive is too large after decompression '
+                    f'(limit: {max_uncompressed_bytes} bytes).'
+                )
         archive.extractall(destination)
 
 
 def _compute_tree_checksum(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(root.rglob('*')):
+        relative_path = str(path.relative_to(root))
+        digest.update(relative_path.encode('utf-8'))
         if path.is_file():
-            digest.update(str(path.relative_to(root)).encode('utf-8'))
             with path.open('rb') as file_obj:
                 while True:
                     chunk = file_obj.read(8192)
                     if not chunk:
                         break
                     digest.update(chunk)
+        elif path.is_symlink():
+            try:
+                digest.update(f"symlink->{os.readlink(path)}".encode('utf-8'))
+            except OSError:
+                digest.update(b'symlink->unreadable')
     return digest.hexdigest()
 
 
@@ -122,11 +146,22 @@ def _ingest_from_zip(scan: Scan, zip_file) -> tuple[str | None, dict]:
 
 def _looks_like_url(reference: str) -> bool:
     parsed = urlparse(reference)
-    if parsed.scheme in ('http', 'https', 'ssh', 'git', 'file'):
+    if parsed.scheme in ('http', 'https', 'ssh', 'git'):
         return True
     if parsed.scheme and parsed.netloc:
         return True
     return False
+
+
+def _validate_remote_git_reference(reference: str) -> str:
+    parsed = urlparse(reference)
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError('Remote repository URL must use http or https scheme.')
+    if parsed.username or parsed.password:
+        raise ValueError('Remote repository URL must not contain embedded credentials.')
+    if not parsed.netloc:
+        raise ValueError('Remote repository URL is invalid.')
+    return reference
 
 
 def validate_repository_source_reference(reference: str) -> dict[str, str]:
@@ -147,7 +182,7 @@ def validate_repository_source_reference(reference: str) -> dict[str, str]:
         raise ValueError('Local repository source must be a git directory or a .zip archive.')
 
     if _looks_like_url(normalized):
-        return {'kind': 'remote_git', 'reference': normalized}
+        return {'kind': 'remote_git', 'reference': _validate_remote_git_reference(normalized)}
 
     mount_path = str(getattr(settings, 'LOCAL_REPO_MOUNT_PATH', '') or '/host/home').strip() or '/host/home'
     raise ValueError(
@@ -268,6 +303,8 @@ def _ingest_from_local_git_directory(scan: Scan, source_dir: Path) -> tuple[str 
 
 
 def _ingest_from_local_zip_path(scan: Scan, zip_path: Path) -> tuple[str | None, dict]:
+    if not zipfile.is_zipfile(zip_path):
+        raise ValueError('Local zip source is not a valid .zip archive.')
     commit_hash, meta = ingest_scan_from_zip_path(scan, zip_path)
     merged_meta = {
         **meta,
@@ -280,6 +317,7 @@ def _ingest_from_local_zip_path(scan: Scan, zip_path: Path) -> tuple[str | None,
 def _ingest_from_git_reference(scan: Scan, reference: str) -> tuple[str | None, dict]:
     workspace_dir, repo_dir = _ensure_workspace(scan.id)
     clone_mode = 'shallow'
+    reference = _validate_remote_git_reference(reference)
 
     clone_result = subprocess.run(
         ['git', 'clone', '--depth', '1', reference, str(repo_dir)],
@@ -346,6 +384,38 @@ def write_bytes_to_workspace(scan_id: int, content: bytes, filename: str = 'snap
     return path
 
 
+def persist_uploaded_zip_for_scan(scan_id: int, uploaded_file) -> Path:
+    upload_root = _shared_upload_dir()
+    try:
+        upload_root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise ValueError(f'Unable to prepare upload workspace: {exc}') from exc
+    archive_path = upload_root / f'{scan_id}.zip'
+
+    max_size = int(getattr(settings, 'SCAN_ZIP_MAX_BYTES', 500 * 1024 * 1024))
+    total = 0
+    try:
+        with archive_path.open('wb') as target:
+            for chunk in uploaded_file.chunks():
+                total += len(chunk)
+                if total > max_size:
+                    archive_path.unlink(missing_ok=True)
+                    raise ValueError(f'Uploaded zip exceeds max size limit ({max_size} bytes).')
+                target.write(chunk)
+    except OSError as exc:
+        archive_path.unlink(missing_ok=True)
+        raise ValueError(f'Unable to store uploaded zip: {exc}') from exc
+
+    if not zipfile.is_zipfile(archive_path):
+        archive_path.unlink(missing_ok=True)
+        raise ValueError('Uploaded file is not a valid .zip archive.')
+
+    # Validate archive constraints before queuing task.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        _safe_extract_zip(archive_path, Path(temp_dir))
+    return archive_path
+
+
 def ingest_scan_from_zip_path(scan: Scan, zip_path: Path) -> tuple[str | None, dict]:
     _, repo_dir = _ensure_workspace(scan.id)
     _safe_extract_zip(zip_path, repo_dir)
@@ -353,16 +423,18 @@ def ingest_scan_from_zip_path(scan: Scan, zip_path: Path) -> tuple[str | None, d
     return None, {
         'source': 'zip',
         'snapshot_checksum': checksum,
+        'archive_checksum': stable_json_hash({'zip_path': str(zip_path), 'size_bytes': zip_path.stat().st_size}),
         'workspace_dir': str(_workspace_dir(scan.id)),
         'repo_dir': str(repo_dir),
     }
 
 
-def cleanup_scan_workspace(scan_id: int) -> None:
+def cleanup_scan_workspace(scan_id: int, retention_seconds: int | None = None) -> None:
     workspace_root = Path(settings.SCAN_WORKDIR)
     workspace_root.mkdir(parents=True, exist_ok=True)
 
-    retention_seconds = int(settings.SCAN_RETENTION_SECONDS)
+    if retention_seconds is None:
+        retention_seconds = int(settings.SCAN_RETENTION_SECONDS)
     current_workspace = _workspace_dir(scan_id)
 
     if retention_seconds <= 0 and current_workspace.exists():

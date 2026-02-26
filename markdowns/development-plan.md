@@ -63,7 +63,7 @@
 
 ## 4) Tool execution (Semgrep + OSV + Gitleaks)
 - [x] Add `scanner/` container (recommended) with pinned versions
-- [ ] Implement tool runners (called from Celery worker):
+- [x] Implement tool runners (called from Celery worker):
   - [x] Semgrep JSON output
   - [x] OSV Scanner JSON output
   - [x] Gitleaks JSON output
@@ -150,7 +150,7 @@
 ---
 
 ## Release checklist
-- [ ] “Happy path” demo: public repo scan end-to-end
+- [x] “Happy path” demo: public repo scan end-to-end
 - [x] “Failure path” demo: invalid repo URL shows useful errors
 - [x] Security: secret masking verified
 - [x] Docs: clear local run instructions

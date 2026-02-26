@@ -4,7 +4,8 @@ from django.db import models
 
 class Project(models.Model):
     name = models.CharField(max_length=255)
-    repo_url = models.URLField(blank=True, null=True)
+    # Source can be remote git URL or local container-visible path.
+    repo_url = models.CharField(max_length=2048, blank=True, null=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

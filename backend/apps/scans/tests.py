@@ -14,7 +14,7 @@ from rest_framework.test import APITestCase
 
 from apps.findings.models import Finding, FindingSeverity, FindingTool
 from apps.projects.models import Project
-from apps.scans.models import AuditEventType, AuditLog
+from apps.scans.models import AuditEventType, AuditLog, Policy
 from apps.scans.tasks import scan_repo
 from apps.scans.tool_runners import run_osv_scanner
 
@@ -31,8 +31,9 @@ class ScanApiTests(APITestCase):
 
     def _init_git_repo(self, repo_dir: str) -> str:
         porcelain.init(repo_dir)
-        Path(repo_dir, 'main.py').write_text('print("scan")\n')
-        porcelain.add(repo=repo_dir, paths=['main.py'])
+        main_file = Path(repo_dir, 'main.py')
+        main_file.write_text('print("scan")\n')
+        porcelain.add(repo=repo_dir, paths=[str(main_file)])
         return porcelain.commit(
             repo=repo_dir,
             message=b'Initial commit',
@@ -124,6 +125,10 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(export_md_response.status_code, status.HTTP_200_OK)
                 self.assertIn('# ScannrAI Report', export_md_response.content.decode('utf-8'))
 
+                export_audit_events = list(AuditLog.objects.filter(scan_id=scan_id).values_list('event_type', flat=True))
+                self.assertIn(AuditEventType.EXPORT_JSON_DOWNLOADED, export_audit_events)
+                self.assertIn(AuditEventType.EXPORT_MD_DOWNLOADED, export_audit_events)
+
     def test_create_scan_from_local_zip_path(self):
         with tempfile.TemporaryDirectory() as source_dir, tempfile.TemporaryDirectory() as workspace:
             zip_path = Path(source_dir) / 'snapshot.zip'
@@ -185,15 +190,40 @@ class ScanApiTests(APITestCase):
                 self.assertEqual(refreshed.data['meta']['source'], 'local_git')
                 self.assertNotIn('ingestion_error', refreshed.data['meta'])
 
-    def test_upload_payload_rejected(self):
-        upload = SimpleUploadedFile('repo.zip', b'PK\x03\x04', content_type='application/zip')
-        response = self.client.post(
-            f'/api/projects/{self.project.id}/scans/',
-            {'zip_file': upload},
-            format='multipart',
-        )
+    def test_upload_zip_scan_supported(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_zip:
+                zip_path = Path(temp_zip.name)
+            try:
+                with zipfile.ZipFile(zip_path, 'w') as archive:
+                    archive.writestr('src/app.py', 'print(\"hello\")\\n')
+                with zip_path.open('rb') as handle:
+                    upload = SimpleUploadedFile('repo.zip', handle.read(), content_type='application/zip')
+
+                with override_settings(SCAN_WORKDIR=workspace, SCAN_RETENTION_SECONDS=3600):
+                    with patch('apps.projects.views.scan_repo.delay', return_value=SimpleNamespace(id='task-uploaded-zip')):
+                        response = self.client.post(
+                            f'/api/projects/{self.project.id}/scans/',
+                            {'zip_file': upload},
+                            format='multipart',
+                        )
+
+                self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+                self.assertEqual(response.data['status'], 'queued')
+                self.assertEqual(response.data['meta']['source_kind'], 'uploaded_zip')
+            finally:
+                zip_path.unlink(missing_ok=True)
+
+    def test_upload_zip_over_size_limit_rejected(self):
+        upload = SimpleUploadedFile('repo.zip', b'1234567890', content_type='application/zip')
+        with override_settings(SCAN_ZIP_MAX_BYTES=4):
+            response = self.client.post(
+                f'/api/projects/{self.project.id}/scans/',
+                {'zip_file': upload},
+                format='multipart',
+            )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('disabled', response.data['detail'])
+        self.assertIn('max size limit', response.data['detail'])
 
     def test_missing_repo_source_returns_400(self):
         response = self.client.post(
@@ -238,8 +268,9 @@ class ScanApiTests(APITestCase):
     def test_create_scan_from_git_repo_url_records_commit_hash(self):
         with tempfile.TemporaryDirectory() as source_repo_dir, tempfile.TemporaryDirectory() as workspace:
             porcelain.init(source_repo_dir)
-            Path(source_repo_dir, 'main.py').write_text('print(\"scan\")\\n')
-            porcelain.add(repo=source_repo_dir, paths=['main.py'])
+            main_file = Path(source_repo_dir, 'main.py')
+            main_file.write_text('print(\"scan\")\\n')
+            porcelain.add(repo=source_repo_dir, paths=[str(main_file)])
             commit_id = porcelain.commit(
                 repo=source_repo_dir,
                 message=b'Initial commit',
@@ -270,7 +301,7 @@ class ScanApiTests(APITestCase):
             self.assertEqual(refreshed.data['commit_hash'], commit_id)
             self.assertEqual(refreshed.data['meta']['source'], 'local_git')
 
-    def test_invalid_repo_url_returns_failed_scan_with_error(self):
+    def test_invalid_repo_url_is_rejected_before_queueing(self):
         with tempfile.TemporaryDirectory() as workspace:
             invalid_project = Project.objects.create(
                 name='Invalid Repo',
@@ -286,13 +317,8 @@ class ScanApiTests(APITestCase):
                         format='json',
                     )
 
-            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-            self.assertEqual(response.data['status'], 'queued')
-            scan_repo(response.data['id'])
-            refreshed = self.client.get(f'/api/scans/{response.data["id"]}/')
-            self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
-            self.assertEqual(refreshed.data['status'], 'failed')
-            self.assertIn('ingestion_error', refreshed.data['meta'])
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertIn('not accessible from scanner runtime', response.data['detail'])
 
     def test_scan_rate_limit_returns_429(self):
         with tempfile.TemporaryDirectory() as source_repo_dir, tempfile.TemporaryDirectory() as workspace:
@@ -332,3 +358,40 @@ class ToolRunnerTests(SimpleTestCase):
 
             self.assertTrue(result['timed_out'])
             self.assertTrue(Path(result['output_path']).exists())
+
+
+class PolicyApiTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='policy-user',
+            email='policy@example.com',
+            password='password123',
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_get_policy_creates_default_policy(self):
+        response = self.client.get('/api/policy')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['tools_enabled']['semgrep'])
+        self.assertTrue(response.data['tools_enabled']['osv'])
+        self.assertTrue(response.data['tools_enabled']['gitleaks'])
+        self.assertTrue(Policy.objects.filter(owner=self.user).exists())
+
+    def test_put_policy_updates_policy(self):
+        response = self.client.put(
+            '/api/policy',
+            {
+                'tools_enabled': {'semgrep': True, 'osv': False, 'gitleaks': True},
+                'severity_threshold': 'medium',
+                'semgrep_timeout_seconds': 700,
+                'osv_timeout_seconds': 300,
+                'gitleaks_timeout_seconds': 250,
+                'retention_days': 2,
+                'gitleaks_rule_severity_overrides': {'generic-api-key': 'critical'},
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['tools_enabled']['osv'], False)
+        self.assertEqual(response.data['severity_threshold'], 'medium')
+        self.assertEqual(response.data['retention_days'], 2)

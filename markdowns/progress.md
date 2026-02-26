@@ -730,3 +730,73 @@
 - Replaced locale-dependent `toLocaleString()` timestamp rendering with deterministic UTC formatting.
 - Added permanent incident reference in `docs/error-logs/2026-02-26-hydration-mismatch-ssr-client-render.md`.
 - Verified frontend passes lint and production build after the fix.
+
+## 2026-02-26 — Enterprise Option B architecture hardening pass (control plane/data plane)
+- Implemented enterprise-oriented Option B scanning architecture updates with minimal disruption:
+  - clear control-plane orchestration in API
+  - worker-only data-plane execution for scanner runtime
+  - policy-driven tool execution and retention snapshot per scan
+- Data model updates:
+  - expanded `Finding` schema (`title`, `description`, `references`)
+  - added per-user `Policy` model
+  - upgraded `AuditLog` with generic fields (`actor`, `action`, `entity_type`, `entity_id`, `timestamp`, `metadata`) while preserving backward compatibility fields
+  - updated `Project.repo_url` to `CharField` for local path support
+- Security/runtime hardening:
+  - zip extraction limits (`SCAN_ZIP_MAX_BYTES`, `SCAN_ZIP_MAX_FILES`) + zip-slip protection
+  - added ZIP upload scan ingestion path using shared upload storage (`SCAN_SHARED_UPLOAD_DIR`)
+  - remote git URL validation (http/https only, no embedded credentials)
+  - strict subprocess runner with timeout + resource limits + truncated/redacted logs
+  - structured task logs with `scan_correlation_id`
+  - middleware IP throttle for scan creation (`SCAN_CREATE_IP_RATE_LIMIT_PER_MINUTE`)
+- Normalization and dedupe improvements:
+  - deterministic fingerprint formula based on tool/rule/file/snippet hash/line range
+  - OSV missing-severity fallback now defaults to medium with explanatory note
+  - Gitleaks rule-id severity override support via policy
+  - raw payload redaction centralized and applied before persistence/API output
+- API updates:
+  - added `GET/PUT /api/policy`
+  - export endpoints now write audit events
+  - scan queue endpoint stores policy snapshot + correlation id
+  - AI endpoints now respect `AI_FEATURE_ENABLED` toggle
+- Frontend API contract updates:
+  - added policy types/client methods
+  - extended finding type fields
+- Added/updated tests for policy endpoint and new behavior; fixed repo setup helpers for cross-environment Dulwich path handling.
+
+### Files changed (high level)
+- `backend/apps/projects/models.py`
+- `backend/apps/findings/models.py`
+- `backend/apps/findings/normalizers.py`
+- `backend/apps/findings/serializers.py`
+- `backend/apps/findings/views.py`
+- `backend/apps/scans/models.py`
+- `backend/apps/scans/admin.py`
+- `backend/apps/scans/audit.py`
+- `backend/apps/scans/policy.py`
+- `backend/apps/scans/serializers.py`
+- `backend/apps/scans/services.py`
+- `backend/apps/scans/tasks.py`
+- `backend/apps/scans/tool_runners.py`
+- `backend/apps/scans/views.py`
+- `backend/scannrai/api_urls.py`
+- `backend/scannrai/settings.py`
+- `backend/scannrai/middleware.py`
+- `backend/apps/projects/tests.py`
+- `backend/apps/scans/tests.py`
+- migrations under `backend/apps/{projects,findings,scans}/migrations/`
+- `frontend/src/lib/api.ts`
+- `frontend/src/types/api.ts`
+- `.env.example`
+- `README.md`
+- `markdowns/development-plan.md`
+
+### Verification commands/results
+- Backend tests:
+  - `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test apps.projects.tests apps.scans.tests apps.findings.tests` -> `OK`
+- Frontend checks:
+  - `cd frontend && npm run lint` -> `OK`
+  - `cd frontend && npm run build` -> `OK`
+- Runtime checks (Docker):
+  - public repo scan queued and completed
+  - export JSON/Markdown endpoints succeeded
+  - secret redaction verified on finding raw payload (`***REDACTED***`, no secret leakage)

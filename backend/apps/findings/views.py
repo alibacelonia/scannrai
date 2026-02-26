@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import mixins, permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -21,6 +22,8 @@ class FindingViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], url_path='ai/explain')
     def ai_explain(self, request, pk=None):
+        if not settings.AI_FEATURE_ENABLED:
+            return Response({'detail': 'AI enrichment is not enabled for this environment.'}, status=503)
         finding = self.get_object()
         explanation, fix_suggestion, confidence = build_finding_explanation(finding)
         finding.ai_explanation = explanation
@@ -39,6 +42,8 @@ class FindingViewSet(mixins.RetrieveModelMixin, viewsets.GenericViewSet):
 
     @action(detail=True, methods=['post'], url_path='ai/patch')
     def ai_patch(self, request, pk=None):
+        if not settings.AI_FEATURE_ENABLED:
+            return Response({'detail': 'AI enrichment is not enabled for this environment.'}, status=503)
         finding = self.get_object()
         patch_diff = build_patch_suggestion(finding)
         finding.ai_patch_diff = patch_diff

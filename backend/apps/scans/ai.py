@@ -1,23 +1,10 @@
-import re
 from collections import Counter
 
 from apps.findings.models import Finding
+from apps.scans.security import redact_text
 from apps.scans.models import Scan
 
 REVIEW_WARNING = 'Review before applying. AI suggestions may be incomplete or incorrect.'
-
-SECRET_PATTERNS = [
-    re.compile(r'(?i)(api[_-]?key\s*[=:]\s*[\"\']?)([a-z0-9_\-]{8,})'),
-    re.compile(r'(?i)(secret\s*[=:]\s*[\"\']?)([a-z0-9_\-]{8,})'),
-    re.compile(r'(?i)(token\s*[=:]\s*[\"\']?)([a-z0-9_\-]{8,})'),
-]
-
-
-def redact_text(value: str) -> str:
-    redacted = value
-    for pattern in SECRET_PATTERNS:
-        redacted = pattern.sub(r'\1***REDACTED***', redacted)
-    return redacted
 
 
 def _severity_priority(severity: str) -> int:

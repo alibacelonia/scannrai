@@ -1,4 +1,5 @@
 from apps.scans.models import Scan
+from apps.scans.security import redact_object
 
 
 def build_scan_export_json(scan: Scan) -> dict:
@@ -8,11 +9,14 @@ def build_scan_export_json(scan: Scan) -> dict:
             'tool': finding.tool,
             'severity': finding.severity,
             'category': finding.category,
+            'title': finding.title,
+            'description': finding.description,
             'file_path': finding.file_path,
             'line_start': finding.line_start,
             'line_end': finding.line_end,
             'fingerprint': finding.fingerprint,
-            'raw': finding.raw,
+            'references': finding.references,
+            'raw': redact_object(finding.raw),
             'ai_explanation': finding.ai_explanation,
             'ai_fix_suggestion': finding.ai_fix_suggestion,
             'ai_patch_diff': finding.ai_patch_diff,
@@ -66,7 +70,7 @@ def build_scan_export_markdown(scan: Scan) -> str:
     if scan.ai_summary:
         lines.extend(['## AI Summary', '', scan.ai_summary, ''])
 
-    lines.extend(['## Findings', '', '| Severity | Tool | Category | File | Lines |', '|---|---|---|---|---|'])
+    lines.extend(['## Findings', '', '| Severity | Tool | Title | File | Lines |', '|---|---|---|---|---|'])
 
     for finding in payload['findings']:
         line_range = (
@@ -74,8 +78,9 @@ def build_scan_export_markdown(scan: Scan) -> str:
             if finding['line_start'] and finding['line_end']
             else str(finding['line_start'] or '-')
         )
+        title = str(finding.get('title') or finding['category']).replace('|', '/')
         lines.append(
-            f"| {finding['severity']} | {finding['tool']} | {finding['category']} | {finding['file_path'] or '-'} | {line_range} |"
+            f"| {finding['severity']} | {finding['tool']} | {title} | {finding['file_path'] or '-'} | {line_range} |"
         )
 
     if not payload['findings']:

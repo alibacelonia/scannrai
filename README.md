@@ -1,131 +1,136 @@
 # ScannrAI
 
-ScannrAI is an AI-assisted code security scanner built with Django, DRF, Celery, Redis, Postgres, and Next.js.
+ScannrAI is an AI Code Reviewer & Security Scanner with a control-plane/data-plane architecture.
 
-## Features
-- Project management with authenticated users
-- Path-based repository sources (remote Git URL, local git directory path, or local `.zip` path)
-- Tool execution pipeline for Semgrep, OSV Scanner, and Gitleaks
-- Normalized and deduped findings across tools
-- Findings filters, detail drawer, code snippet view, and raw payload view
-- AI endpoints for scan summary, finding explanation, and patch scaffolding
-- Export endpoints (JSON and Markdown)
-- Background scan execution via Celery + Redis queue (MQ)
-- Scan hardening: rate limits, timeout controls, retention policy, and audit logs
+## Core Architecture
 
-## Architecture
 ```mermaid
 flowchart LR
   User["User"] --> Frontend["Next.js Frontend"]
-  Frontend --> API["Django + DRF API"]
+  Frontend --> API["Django/DRF Control Plane"]
   API --> DB["Postgres"]
-  API --> Redis["Redis"]
-  API --> Worker["Celery Worker"]
-  Worker --> Scanner["Semgrep / OSV / Gitleaks"]
+  API --> Redis["Redis (Broker)"]
+  API --> WorkerQueue["Celery Queue"]
+  WorkerQueue --> Worker["Celery Worker (Data Plane)"]
+  Worker --> Workspace["/tmp/scannrai/<scan_id>/"]
+  Worker --> Tools["Semgrep + OSV Scanner + Gitleaks"]
   Worker --> DB
 ```
 
-## Tech Stack
-- Backend: Django, DRF, SimpleJWT, Celery
-- Frontend: Next.js App Router, TypeScript, Tailwind, shadcn-style UI
-- Infra: Docker Compose, Postgres, Redis
-- Scanners: Semgrep, OSV Scanner, Gitleaks
+- Control plane: accepts requests, validates sources, enqueues scans, serves findings/exports/policy.
+- Data plane: performs ingestion + scanner execution only in worker runtime.
+- API never runs scanner processes directly.
 
-## Repo Structure
-- `backend/` Django API + worker logic
-- `frontend/` Next.js application
-- `infra/` Dockerfiles and startup scripts
-- `markdowns/` MVP plan and progress tracker
-- `seed/` Demo repository and sample scan exports
-- `docs/screenshots/` UI reference images
+## Feature Summary
+- Option B language-agnostic scanners:
+  - Semgrep (SAST)
+  - OSV Scanner (dependency vulnerabilities)
+  - Gitleaks (secrets)
+- Secure ingestion:
+  - remote git URL (shallow clone depth=1)
+  - local git path
+  - local zip path and uploaded zip (`zip_file`) with zip-slip + size/file-count enforcement
+- Normalized findings schema with dedupe fingerprints
+- Per-user policy (`/api/policy`) for tool enablement, thresholds, per-tool timeouts, retention
+- Audit logging for queue/start/complete/fail + export downloads + policy updates
+- Export endpoints (`export.json`, `export.md`)
+- Optional AI enrichment endpoints (toggle with `AI_FEATURE_ENABLED`)
 
-## Setup and Run
+## Normalized Finding Model
+Each finding persists:
+- `tool`, `severity`, `category`, `title`, `description`
+- `file_path`, `line_start`, `line_end`
+- `references` JSON
+- `fingerprint` (stable hash)
+- `raw` JSON (sanitized/redacted)
+- optional AI fields (`ai_explanation`, `ai_fix_suggestion`, `ai_patch_diff`, `confidence`)
+
+## Security/Hardening Highlights
+- Strict subprocess execution (`shell=False`), per-tool timeouts
+- Runner resource limits (memory + CPU time)
+- Truncated stdout/stderr capture to avoid unbounded logs
+- Secret redaction in persisted raw payloads and API responses
+- IP-level middleware throttle for scan creation + per-user/hour scan rate limit
+- Workspace cleanup with retention policy
+- Structured scan logging with `scan_correlation_id`
+
+## API Endpoints
+- `POST /api/projects`
+- `GET /api/projects`
+- `POST /api/projects/{id}/scans`
+  - JSON body for path/url-based scans
+  - `multipart/form-data` with `zip_file` for uploaded zip scans
+- `GET /api/scans/{id}`
+- `GET /api/scans/{id}/findings?severity=&tool=&category=&file=`
+- `GET /api/findings/{id}`
+- `GET /api/scans/{id}/export.json`
+- `GET /api/scans/{id}/export.md`
+- `GET /api/policy`
+- `PUT /api/policy`
+
+## Local Setup
 
 ### Prerequisites
 - Docker Desktop (or Docker Engine + Compose plugin)
-- Node.js `22+` and npm `10+` (optional, only needed for running frontend outside Docker)
-- Python `3.12+` (optional, only needed for backend tests outside Docker)
+- Node.js 22+ (optional for local frontend-only commands)
+- Python 3.12+ (optional for local backend tests)
 
-### 1) Configure Environment
-1. Copy the example environment file:
-   - `cp .env.example .env`
-2. Review and adjust values if needed:
-   - `DJANGO_SECRET_KEY`
-   - `POSTGRES_*`
-   - `POSTGRES_HOST_PORT` (host binding; default `5433`)
-   - `REDIS_HOST_PORT` (host binding; default `6380`)
-   - `CORS_ALLOWED_ORIGINS` (must include frontend URL, default `http://localhost:3000`)
-   - `NEXT_PUBLIC_API_BASE_URL`
-   - `SCAN_*` settings (timeouts, retention, rate limits)
-   - `LOCAL_REPO_MOUNT_PATH` (container path where host home is mounted; default `/host/home`)
+### 1) Configure env
+```bash
+cp .env.example .env
+```
 
-### 2) Start the Full App (Docker)
-1. Build and run all services:
-   - `docker compose up --build`
-2. Services started by Compose:
-   - `postgres`
-   - `redis`
-   - `backend` (Django API)
-   - `worker` (Celery)
-   - `scanner` (tooling image)
-   - `frontend` (Next.js)
+Important vars:
+- `POSTGRES_*`, `REDIS_HOST_PORT`
+- `CORS_ALLOWED_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`
+- `SCAN_TOOL_TIMEOUT_SECONDS`, `SCAN_TOOL_MEMORY_LIMIT_MB`, `SCAN_TOOL_CPU_TIME_SECONDS`
+- `SCAN_ZIP_MAX_BYTES`, `SCAN_ZIP_MAX_FILES`
+- `SCAN_SHARED_UPLOAD_DIR` (backend/worker shared path for uploaded zip ingestion)
+- `SCAN_RETENTION_SECONDS`, `SCAN_RATE_LIMIT_PER_HOUR`, `SCAN_CREATE_IP_RATE_LIMIT_PER_MINUTE`
+- `LOCAL_REPO_MOUNT_PATH` (default `/host/home`)
+- `AI_FEATURE_ENABLED` (`1` enabled, `0` disabled)
 
-### 3) Access the App
-- Frontend UI: [http://localhost:3000](http://localhost:3000)
-- Backend API root (via routes): [http://localhost:8000/api/](http://localhost:8000/api/)
-- Health endpoint: [http://localhost:8000/api/health/](http://localhost:8000/api/health/)
-- Postgres host port: `localhost:${POSTGRES_HOST_PORT:-5433}`
-- Redis host port: `localhost:${REDIS_HOST_PORT:-6380}`
+### 2) Start stack
+```bash
+docker compose up --build
+```
 
-### 4) First Use
-1. Open `/register` in the frontend and create an account.
-2. Sign in at `/login`.
-3. Open a repository from the dashboard:
-   - Remote: paste a Git repository URL (for example `https://github.com/org/repo`).
-   - Local:
-     - click `Select repo folder` to choose a folder
-     - app resolves local path and validates source with backend before open
-     - app fills source path automatically when browser exposes absolute paths
-     - otherwise, paste or confirm/edit path manually
-     - local git directory (for example `/host/home/dev/my-repo`)
-     - local zip file path (for example `/host/home/dev/my-repo.zip`)
-4. Run a scan from the repository page. Scan is queued immediately and runs in the background worker.
-5. Review findings and export JSON/Markdown from the scan detail page.
+Services:
+- `postgres`
+- `redis`
+- `backend`
+- `worker`
+- `scanner`
+- `frontend`
 
-### Local Source Path Tips
-- Local sources are path-based only (no browser upload).
-- Folder/local path is server-validated before scan queueing.
-- In Docker compose, host home is mounted read-only to `${LOCAL_REPO_MOUNT_PATH}` (`/host/home` by default).
-- If your host repo path is `/Users/<you>/dev/repo`, enter `/host/home/dev/repo` in the app.
-- For local zip snapshots, enter the zip path directly, for example `/host/home/dev/repo.zip`.
-- If you see `Repository source path is not accessible from scanner runtime`, your path is incomplete or wrong; include full nested directories (example: `/host/home/personal-projects/<repo-folder>`).
+### 3) Access
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- API root: [http://localhost:8000/api/](http://localhost:8000/api/)
+- Health: [http://localhost:8000/api/health/](http://localhost:8000/api/health/)
 
 ## Development Commands
-- Start in background:
-  - `docker compose up -d --build`
-- Stop services:
-  - `docker compose down`
-- View logs:
-  - `docker compose logs -f backend worker frontend`
-- Rebuild one service:
-  - `docker compose build backend`
-- Clean Docker cache/artifacts (safe mode):
-  - `make docker-clean`
-- Run backend tests:
-  - `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test`
-- Frontend lint/build:
-  - `cd frontend && npm run lint && npm run build`
+- Start detached: `docker compose up -d --build`
+- Stop: `docker compose down`
+- Logs: `docker compose logs -f backend worker frontend`
+- Run migrations: `docker compose exec backend python manage.py migrate`
+- Backend tests: `USE_SQLITE=1 /Users/ralphvincent/.pyenv/versions/3.12.11/bin/python3 backend/manage.py test`
+- Frontend checks: `cd frontend && npm run lint && npm run build`
+- Docker cleanup: `make docker-clean`
 
-## Screenshots
-- Dashboard: ![Dashboard](docs/screenshots/dashboard.svg)
-- Scan page: ![Scan](docs/screenshots/scan.svg)
+## Local Source Path Notes
+- Local scans are path-based by default; zip upload is available via scan-create API.
+- Paths must be container-visible under `${LOCAL_REPO_MOUNT_PATH}`.
+- Example host path `/Users/<you>/projects/repo` becomes `/host/home/projects/repo`.
 
-## Demo Assets
-- Seed repo to scan: `seed/demo-repo/`
-- Sample scan export JSON: `seed/sample-results/sample-scan-export.json`
-- Sample scan report Markdown: `seed/sample-results/sample-scan-report.md`
+## Runtime Verification (latest)
+Validated with live API smoke checks:
+- create project
+- queue scan on public repo
+- queue scan from uploaded zip (`zip_file`)
+- scan completes
+- export endpoints return data
+- secret redaction confirmed on finding raw payloads
 
-## Notes
-- Docker daemon must be running for full compose startup.
-- If local `git` is unavailable on macOS, scan ingestion falls back to Dulwich clone logic.
-- Build/runtime troubleshooting entries are tracked in `docs/error-logs/`.
+## Operational Notes
+- If Docker runtime storage is exhausted and Postgres fails with `No space left on device`, run `make docker-clean`.
+- Incident logs are tracked under `docs/error-logs/`.

@@ -1,5 +1,5 @@
 import { clearTokens, getAccessToken } from "@/lib/auth";
-import type { Finding, Paginated, Project, Scan, TokenPair, User } from "@/types/api";
+import type { Finding, Paginated, Policy, Project, Scan, TokenPair, User } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -208,6 +208,18 @@ export async function exportScanMarkdown(scanId: string): Promise<Blob> {
     throw new ApiError("Unable to export Markdown report.", response.status);
   }
   return response.blob();
+}
+
+export async function getPolicy(): Promise<Policy> {
+  return apiRequest<Policy>("/api/policy");
+}
+
+export async function updatePolicy(policy: Omit<Policy, "created_at" | "updated_at">): Promise<Policy> {
+  return apiRequest<Policy>("/api/policy", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(policy),
+  });
 }
 
 export { ApiError };

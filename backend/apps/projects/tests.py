@@ -60,8 +60,9 @@ class ProjectApiTests(APITestCase):
     def test_validate_source_accepts_local_git_repo(self):
         with tempfile.TemporaryDirectory() as repo_dir:
             porcelain.init(repo_dir)
-            Path(repo_dir, 'main.py').write_text('print("ok")\n')
-            porcelain.add(repo=repo_dir, paths=['main.py'])
+            main_file = Path(repo_dir, 'main.py')
+            main_file.write_text('print("ok")\n')
+            porcelain.add(repo=repo_dir, paths=[str(main_file)])
             porcelain.commit(
                 repo=repo_dir,
                 message=b'init',
@@ -95,8 +96,9 @@ class ProjectApiTests(APITestCase):
             repo_dir = Path(mount_root) / 'personal-projects' / 'scannrai'
             repo_dir.mkdir(parents=True, exist_ok=True)
             porcelain.init(str(repo_dir))
-            Path(repo_dir, 'main.py').write_text('print("ok")\n')
-            porcelain.add(repo=str(repo_dir), paths=['main.py'])
+            main_file = Path(repo_dir, 'main.py')
+            main_file.write_text('print("ok")\n')
+            porcelain.add(repo=str(repo_dir), paths=[str(main_file)])
             porcelain.commit(
                 repo=str(repo_dir),
                 message=b'init',

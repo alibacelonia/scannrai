@@ -1,4 +1,5 @@
 from datetime import timedelta
+from uuid import uuid4
 
 from django.conf import settings
 from django.utils import timezone
@@ -8,8 +9,13 @@ from rest_framework.response import Response
 
 from apps.scans.audit import record_audit_event
 from apps.scans.models import AuditEventType, Scan, ScanStatus
+from apps.scans.policy import get_or_create_policy_for_user, policy_snapshot
 from apps.scans.serializers import ScanCreateSerializer, ScanSerializer
-from apps.scans.services import discover_local_source_candidates, validate_repository_source_reference
+from apps.scans.services import (
+    discover_local_source_candidates,
+    persist_uploaded_zip_for_scan,
+    validate_repository_source_reference,
+)
 from apps.scans.tasks import scan_repo
 
 from .models import Project
@@ -67,29 +73,34 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        if request.FILES.get('zip_file') or request.FILES.getlist('repo_files') or request.data.get('repo_paths'):
+        if request.FILES.getlist('repo_files') or request.data.get('repo_paths'):
             return Response(
                 {
                     'detail': (
-                        'Upload-based local sources are disabled. '
-                        'Set the project repository source to a local path or remote git URL.'
+                        'Folder upload is disabled. '
+                        'Use zip upload or set project repository source to a local path/remote git URL.'
                     )
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not (project.repo_url or '').strip():
-            return Response(
-                {'detail': 'Repository source is required. Set a local path, local zip path, or remote git URL first.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        try:
-            source_validation = validate_repository_source_reference(project.repo_url)
-        except ValueError as exc:
-            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        zip_file = request.FILES.get('zip_file')
+        source_validation = {'kind': 'uploaded_zip'}
+        if zip_file is None:
+            if not (project.repo_url or '').strip():
+                return Response(
+                    {'detail': 'Repository source is required. Set a local path, local zip path, upload zip, or remote git URL first.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            try:
+                source_validation = validate_repository_source_reference(project.repo_url)
+            except ValueError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ScanCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        policy = get_or_create_policy_for_user(request.user)
+        scan_correlation_id = f'scan-{uuid4().hex}'
         scan = Scan.objects.create(
             project=project,
             status=ScanStatus.QUEUED,
@@ -102,15 +113,30 @@ class ProjectViewSet(viewsets.ModelViewSet):
             meta['queued_by'] = request.user.id
             meta['queued_at'] = timezone.now().isoformat()
             meta['source_kind'] = source_validation['kind']
+            meta['scan_correlation_id'] = scan_correlation_id
+            meta['policy'] = policy_snapshot(policy)
             scan.meta = meta
-            async_result = scan_repo.delay(scan.id)
+            zip_path_arg = None
+            if zip_file is not None:
+                try:
+                    queued_zip_path = persist_uploaded_zip_for_scan(scan.id, zip_file)
+                except ValueError as exc:
+                    scan.status = ScanStatus.FAILED
+                    scan.meta['queue_error'] = str(exc)
+                    scan.save(update_fields=['status', 'meta', 'updated_at'])
+                    return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+                zip_path_arg = str(queued_zip_path)
+                scan.meta['uploaded_zip_path'] = zip_path_arg
+                scan.meta['uploaded_zip_name'] = getattr(zip_file, 'name', f'{scan.id}.zip')
+
+            async_result = scan_repo.delay(scan.id, zip_path=zip_path_arg)
             scan.meta['task_id'] = async_result.id
             record_audit_event(
                 scan=scan,
-                event_type=AuditEventType.SCAN_STARTED,
+                event_type=AuditEventType.SCAN_QUEUED,
                 user=request.user,
                 message='Scan queued.',
-                meta={'task_id': async_result.id},
+                meta={'task_id': async_result.id, 'scan_correlation_id': scan_correlation_id},
             )
         except Exception as exc:
             meta = dict(scan.meta or {})

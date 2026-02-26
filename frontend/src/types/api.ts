@@ -36,9 +36,12 @@ export interface Finding {
   tool: Tool;
   severity: Severity;
   category: string;
+  title: string;
+  description: string;
   file_path: string;
   line_start: number | null;
   line_end: number | null;
+  references: Array<{ type: string; value: string }>;
   raw: Record<string, unknown>;
   fingerprint: string;
   created_at: string;
@@ -62,4 +65,20 @@ export interface User {
   id: number;
   username: string;
   email: string;
+}
+
+export interface Policy {
+  tools_enabled: {
+    semgrep: boolean;
+    osv: boolean;
+    gitleaks: boolean;
+  };
+  severity_threshold: Severity;
+  semgrep_timeout_seconds: number;
+  osv_timeout_seconds: number;
+  gitleaks_timeout_seconds: number;
+  retention_days: number;
+  gitleaks_rule_severity_overrides: Record<string, Severity>;
+  created_at: string;
+  updated_at: string;
 }
