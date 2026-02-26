@@ -1,5 +1,7 @@
 .env
 *.env.example
+docs/
+markdowns/
 .venv/
 venv/
 __pycache__/
