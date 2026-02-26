@@ -93,7 +93,7 @@ export default function ProjectsPage() {
             const summary = scanSummary[project.id] ?? { total: 0, running: 0, queued: 0, failed: 0 };
             return (
               <Link
-                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--bg-muted)]"
+                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:bg-[var(--bg-muted)]"
                 href={`/projects/${project.id}`}
                 key={project.id}
               >

@@ -27,3 +27,4 @@ This folder tracks build/runtime incidents with:
 - [2026-02-26 scan polling unauthorized and session drop while waiting](./2026-02-26-scan-polling-unauthorized-session-drop.md)
 - [2026-02-26 folder picker missed repos outside preferred roots](./2026-02-26-folder-picker-missed-nonpreferred-root.md)
 - [2026-02-26 folder picker missed repos with `.git` marker file](./2026-02-26-folder-picker-git-marker-file-mismatch.md)
+- [2026-02-26 postgres startup failed from Buildx state volume exhaustion](./2026-02-26-postgres-no-space-buildx-state-volume.md)

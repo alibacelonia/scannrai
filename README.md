@@ -133,4 +133,5 @@ Validated with live API smoke checks:
 
 ## Operational Notes
 - If Docker runtime storage is exhausted and Postgres fails with `No space left on device`, run `make docker-clean`.
+- If the error persists, run `./infra/scripts/docker-clean.sh --with-builders` to remove non-default buildx builder state volumes.
 - Incident logs are tracked under `docs/error-logs/`.

@@ -125,7 +125,7 @@ export default function ScansPage() {
           <div className="space-y-2">
             {filteredRows.map((row) => (
               <Link
-                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--bg-muted)]"
+                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:bg-[var(--bg-muted)]"
                 href={`/scans/${row.scan.id}`}
                 key={row.scan.id}
               >

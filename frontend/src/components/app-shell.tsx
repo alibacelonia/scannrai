@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               }
             }}
             className={cn(
-              "group flex items-center rounded-xl px-3 py-2.5 text-[13px] transition",
+              "group flex items-center rounded-xl border-0 px-3 py-2.5 text-[13px] transition",
               active
                 ? "bg-white text-slate-900"
                 : "text-slate-700 hover:bg-slate-100",
@@ -186,8 +186,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const accountMenu = (mode: "compact" | "expanded" | "mobile") => {
     const triggerClass =
       mode === "compact"
-        ? "inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-800 hover:bg-slate-100"
-        : "flex w-full items-center gap-2 rounded-xl px-1.5 py-1.5 text-left hover:bg-slate-100";
+        ? "inline-flex h-9 w-9 appearance-none items-center justify-center rounded-full border-0 text-slate-800 outline-none hover:bg-slate-100 focus:outline-none focus-visible:outline-none"
+        : "flex w-full appearance-none items-center gap-2 rounded-xl border-0 px-1.5 py-1.5 text-left outline-none hover:bg-slate-100 focus:outline-none focus-visible:outline-none";
 
     return (
       <DropdownMenu>
@@ -259,7 +259,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
           <button
             aria-label={desktopCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+            className="inline-flex h-8 w-8 appearance-none items-center justify-center rounded-md border-0 text-slate-600 outline-none hover:bg-slate-100 focus:outline-none focus-visible:outline-none"
             onClick={() => setDesktopCollapsed((prev) => !prev)}
             type="button"
           >
@@ -337,7 +337,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <button
                 aria-label="Close navigation menu"
-                className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-md border-0 p-1 text-slate-500 outline-none hover:bg-slate-100 focus:outline-none focus-visible:outline-none"
                 onClick={() => setMobileDrawerOpen(false)}
                 type="button"
               >

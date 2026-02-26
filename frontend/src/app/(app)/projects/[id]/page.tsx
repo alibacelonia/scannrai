@@ -156,7 +156,7 @@ export default function ProjectPage() {
             {scans.length === 0 ? <p className="text-xs text-[var(--ink-muted)]">No scans yet.</p> : null}
             {scans.map((scan) => (
               <Link
-                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--bg-muted)]"
+                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:bg-[var(--bg-muted)]"
                 href={`/scans/${scan.id}`}
                 key={scan.id}
               >
