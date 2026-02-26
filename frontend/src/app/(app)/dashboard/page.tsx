@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderGit2, GitBranch, Laptop, Loader2, PlayCircle, RefreshCw, ScanSearch, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
+import { FolderGit2, GitBranch, Laptop, Loader2, PlayCircle, ScanSearch, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -195,6 +195,8 @@ export default function DashboardPage() {
       failed,
     };
   }, [allScans, projects.length]);
+  const completionRate = summary.scans > 0 ? Math.round((summary.completed / summary.scans) * 100) : 0;
+  const failureRate = summary.scans > 0 ? Math.round((summary.failed / summary.scans) * 100) : 0;
 
   const projectNameById = useMemo(() => {
     return Object.fromEntries(projects.map((project) => [project.id, project.name]));
@@ -399,52 +401,85 @@ export default function DashboardPage() {
       eyebrow="Workspace"
       title="Dashboard"
       description="Manage repositories and trigger background scans from remote URLs or local repository paths."
-      actions={
-        <Button onClick={() => void loadData()} size="sm" type="button" variant="outline">
-          <RefreshCw className="mr-2 h-3.5 w-3.5" />
-          Refresh
-        </Button>
-      }
     >
       <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
         <Card className="rounded-2xl border-slate-300 bg-white">
-          <CardHeader className="space-y-3">
+          <CardHeader className="space-y-3 pb-2">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Security Operations</p>
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Security Operations</p>
+                </div>
                 <CardTitle className="text-lg">Repository scanning control center</CardTitle>
                 <CardDescription>Track scanner throughput and jump into repositories with one click.</CardDescription>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 shadow-sm">
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
                 <ShieldAlert className="h-5 w-5" />
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <StatTile icon={FolderGit2} label="Repositories" value={summary.repositories} />
               <StatTile icon={ScanSearch} label="Total scans" value={summary.scans} />
               <StatTile icon={ShieldCheck} label="Completed" value={summary.completed} />
               <StatTile icon={ShieldX} label="Failed" value={summary.failed} />
             </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl bg-slate-100/90 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Completion rate</p>
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <p className="text-lg font-semibold text-slate-900">{completionRate}%</p>
+                  <p className="text-[11px] text-slate-500">{summary.completed} of {summary.scans || 0} scans</p>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${completionRate}%` }} />
+                </div>
+              </div>
+              <div className="rounded-xl bg-slate-100/90 px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Failure rate</p>
+                <div className="mt-1 flex items-end justify-between gap-2">
+                  <p className="text-lg font-semibold text-slate-900">{failureRate}%</p>
+                  <p className="text-[11px] text-slate-500">{summary.failed} failed scans</p>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-rose-500" style={{ width: `${failureRate}%` }} />
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="text-sm">Live pipeline</CardTitle>
-            <CardDescription>Current queue and execution health.</CardDescription>
+        <Card className="rounded-2xl border-slate-300 bg-white">
+          <CardHeader className="space-y-3 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Pipeline</p>
+                </div>
+                <CardTitle className="text-lg">Live pipeline</CardTitle>
+                <CardDescription>Current queue depth and most recent processing activity.</CardDescription>
+              </div>
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
+                <ScanSearch className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active scans</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900">{summary.running}</p>
-              <p className="mt-1 text-[11px] text-slate-600">Queued and running scans across all repositories.</p>
+            <div className="rounded-xl bg-slate-100/90 px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Active scans</p>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <p className="text-lg font-semibold text-slate-900">{summary.running}</p>
+                <p className="text-[11px] text-slate-500">Queued + running</p>
+              </div>
+              <p className="mt-2 text-[11px] text-slate-600">Queued and running scans across all repositories.</p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Last activity</p>
+            <div className="rounded-xl bg-slate-100/90 px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500">Last activity</p>
               <p className="mt-1 text-sm font-semibold text-slate-900">{formatDateTime(recentScans[0]?.created_at ?? null)}</p>
-              <p className="mt-1 text-[11px] text-slate-600">Most recent scan creation timestamp.</p>
+              <p className="mt-2 text-[11px] text-slate-600">Most recent scan creation timestamp.</p>
             </div>
           </CardContent>
         </Card>
@@ -463,17 +498,25 @@ export default function DashboardPage() {
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4" />
-              Open Remote Repository
-            </CardTitle>
-            <CardDescription>Connect a public Git URL and start tracking scans.</CardDescription>
+        <Card className="rounded-2xl border-slate-300 bg-white">
+          <CardHeader className="space-y-3 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Repository Input</p>
+                </div>
+                <CardTitle className="text-lg">Open Remote Repository</CardTitle>
+                <CardDescription>Connect a public git URL and start tracking scans.</CardDescription>
+              </div>
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
+                <GitBranch className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={openRemoteRepository}>
-              <div className="space-y-1">
+              <div className="space-y-1 rounded-xl bg-slate-100/90 px-3 py-3">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Remote URL</label>
                 <Input
                   onChange={(event) => setRemoteRepoUrl(event.target.value)}
@@ -495,13 +538,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Laptop className="h-4 w-4" />
-              Open Local Repository
-            </CardTitle>
-            <CardDescription>Pick a folder or paste a container-visible local path.</CardDescription>
+        <Card className="rounded-2xl border-slate-300 bg-white">
+          <CardHeader className="space-y-3 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Local Source</p>
+                </div>
+                <CardTitle className="text-lg">Open Local Repository</CardTitle>
+                <CardDescription>Pick a folder or paste a container-visible local path.</CardDescription>
+              </div>
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
+                <Laptop className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <input
@@ -514,7 +565,7 @@ export default function DashboardPage() {
               onChange={handleLocalFolderSelection}
             />
             <form className="space-y-3" onSubmit={openLocalRepository}>
-              <div className="space-y-1">
+              <div className="space-y-1 rounded-xl bg-slate-100/90 px-3 py-3">
                 <label className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Local source path</label>
                 <Input
                   onChange={(event) => setLocalSourcePath(event.target.value)}
@@ -578,15 +629,26 @@ export default function DashboardPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Repositories</CardTitle>
-            <CardDescription>Open details or start a new scan from any repository.</CardDescription>
+        <Card className="rounded-2xl border-slate-300 bg-white">
+          <CardHeader className="space-y-3 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Repository Index</p>
+                </div>
+                <CardTitle className="text-lg">Repositories</CardTitle>
+                <CardDescription>Open details or start a new scan from any repository.</CardDescription>
+              </div>
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
+                <FolderGit2 className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {projectRows.length === 0 ? <p className="text-xs text-slate-500">No repositories yet.</p> : null}
             {projectRows.map(({ project, scanCount, latestScan }) => (
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3" key={project.id}>
+              <div className="rounded-xl bg-slate-100/90 p-3" key={project.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 space-y-1">
                     <Link className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900 hover:text-slate-700" href={`/projects/${project.id}`}>
@@ -623,15 +685,26 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Recent Scans</CardTitle>
-            <CardDescription>Latest scans across all repositories.</CardDescription>
+        <Card className="rounded-2xl border-slate-300 bg-white">
+          <CardHeader className="space-y-3 pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-2.5 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">Scan Timeline</p>
+                </div>
+                <CardTitle className="text-lg">Recent Scans</CardTitle>
+                <CardDescription>Latest scans across all repositories.</CardDescription>
+              </div>
+              <div className="rounded-full bg-slate-100 p-2.5 text-slate-700">
+                <ScanSearch className="h-5 w-5" />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-2">
             {recentScans.length === 0 ? <p className="text-xs text-slate-500">No scans yet.</p> : null}
             {recentScans.map((scan) => (
-              <Link className="block rounded-xl border border-slate-200 bg-slate-50/50 p-3 hover:bg-slate-100" href={`/scans/${scan.id}`} key={scan.id}>
+              <Link className="block rounded-xl bg-slate-100/90 p-3" href={`/scans/${scan.id}`} key={scan.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-900">Scan #{scan.id}</p>
