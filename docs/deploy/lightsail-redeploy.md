@@ -2,6 +2,20 @@
 
 Use this when you already have ScannrAI running on Lightsail and want to deploy the latest GitHub changes.
 
+## Quick Update + Redeploy (copy/paste)
+
+```bash
+ssh -i ~/scannrai-prod.pem ubuntu@<LIGHTSAIL_STATIC_IP>
+cd /opt/scannrai
+git fetch --all --prune
+git pull origin master
+./infra/scripts/lightsail-deploy.sh
+docker compose -f docker-compose.yml -f docker-compose.lightsail.yml ps
+docker compose -f docker-compose.yml -f docker-compose.lightsail.yml logs --tail=120 backend frontend worker caddy
+```
+
+If your branch is `main`, use `git pull origin main`.
+
 ## 1) SSH into your Lightsail instance
 
 ```bash
@@ -24,7 +38,7 @@ git clone https://github.com/alibacelonia/scannrai.git
 cd /opt/scannrai
 ./infra/scripts/lightsail-vm-bootstrap.sh
 # IMPORTANT: logout/login once after bootstrap so docker group applies
-cp infra/env/lightsail.env.example .env
+cp infra/env/lightsail.env.template .env
 nano .env
 ```
 

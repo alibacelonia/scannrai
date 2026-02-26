@@ -51,7 +51,7 @@ docker compose version
 ## 5) Configure environment
 
 ```bash
-cp infra/env/lightsail.env.example .env
+cp infra/env/lightsail.env.template .env
 nano .env
 ```
 

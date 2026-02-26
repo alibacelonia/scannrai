@@ -6,7 +6,7 @@ cd "${ROOT_DIR}"
 
 if [[ ! -f ".env" ]]; then
   echo ".env file not found in ${ROOT_DIR}."
-  echo "Create it first: cp infra/env/lightsail.env.example .env"
+  echo "Create it first: cp infra/env/lightsail.env.template .env"
   exit 1
 fi
 

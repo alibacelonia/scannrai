@@ -80,7 +80,7 @@ Each finding persists:
 
 ### 1) Configure env
 ```bash
-cp .env.example .env
+cp env.template .env
 ```
 
 Important vars:
