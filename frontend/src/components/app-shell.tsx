@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   ChevronsUpDown,
   FolderGit2,
@@ -26,11 +26,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getMe } from "@/lib/api";
 import { clearTokens } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import type { User } from "@/types/api";
 
 const SIDEBAR_WIDTH_EXPANDED = 224;
 const SIDEBAR_WIDTH_COLLAPSED = 72;
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "scannrai.sidebar.collapsed";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,17 +42,11 @@ const navItems = [
   { href: "/policy", label: "Policy", icon: Settings2 },
 ];
 
-const account = {
-  name: "scannrai",
-  email: "security@workspace.local",
-  initials: "SR",
-};
-
 function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function Avatar({ className }: { className?: string }) {
+function Avatar({ initials, className }: { initials: string; className?: string }) {
   return (
     <span
       className={cn(
@@ -57,7 +54,7 @@ function Avatar({ className }: { className?: string }) {
         className,
       )}
     >
-      {account.initials}
+      {initials}
     </span>
   );
 }
@@ -66,8 +63,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [sidebarStateReady, setSidebarStateReady] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useLayoutEffect(() => {
+    try {
+      const storedValue = window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+      if (storedValue === "1") {
+        setDesktopCollapsed(true);
+      }
+    } finally {
+      setSidebarStateReady(true);
+    }
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = mobileDrawerOpen ? "hidden" : "";
@@ -85,6 +95,45 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!sidebarStateReady) {
+      return;
+    }
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, desktopCollapsed ? "1" : "0");
+  }, [desktopCollapsed, sidebarStateReady]);
+
+  useEffect(() => {
+    let mounted = true;
+    void getMe()
+      .then((user) => {
+        if (mounted) {
+          setAuthUser(user);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setAuthUser(null);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const accountName = authUser?.username || "Account";
+  const accountEmail = authUser?.email || "No email";
+  const accountInitials = useMemo(() => {
+    const source = (authUser?.username || authUser?.email || "AC").trim();
+    if (!source) {
+      return "AC";
+    }
+    const parts = source.split(/[\s._-]+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return source.slice(0, 2).toUpperCase();
+  }, [authUser]);
 
   const currentSectionLabel = useMemo(() => {
     if (pathname.startsWith("/policy")) return "Policy";
@@ -144,12 +193,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button aria-label="Open profile menu" className={triggerClass} type="button">
-            <Avatar className="h-8 w-8" />
+            <Avatar className="h-8 w-8" initials={accountInitials} />
             {mode !== "compact" ? (
               <>
                 <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-slate-900">{account.name}</p>
-                  <p className="truncate text-xs text-slate-500">{account.email}</p>
+                  <p className="truncate text-[13px] font-semibold text-slate-900">{accountName}</p>
+                  <p className="truncate text-xs text-slate-500">{accountEmail}</p>
                 </div>
                 <ChevronsUpDown className="ml-auto h-4 w-4 text-slate-500" />
               </>
@@ -164,22 +213,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <DropdownMenuLabel className="normal-case">
             <div className="flex items-center gap-2">
-              <Avatar className="h-9 w-9" />
+              <Avatar className="h-9 w-9" initials={accountInitials} />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{account.name}</p>
-                <p className="truncate text-xs text-slate-500">{account.email}</p>
+                <p className="truncate text-[13px] font-normal text-slate-900">{accountName}</p>
+                <p className="truncate text-[11px] font-normal text-slate-500">{accountEmail}</p>
               </div>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link className="cursor-pointer" href="/profile" onClick={() => setMobileDrawerOpen(false)}>
+          <DropdownMenuItem asChild className="text-xs font-normal">
+            <Link className="cursor-pointer text-xs font-normal" href="/profile" onClick={() => setMobileDrawerOpen(false)}>
               <UserCircle2 className="mr-2 h-4 w-4" />
               Account
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-red-700 focus:bg-red-50 focus:text-red-800"
+            className="text-xs font-normal text-red-700 focus:bg-red-50 focus:text-red-800"
             onSelect={(event) => {
               event.preventDefault();
               logout();
@@ -195,7 +244,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebar = (
     <>
-      <div className={cn("border-b border-slate-200 p-3", desktopCollapsed ? "px-2" : "px-3")}>
+      <div className={cn("p-3", desktopCollapsed ? "px-2" : "px-3")}>
         <div className={cn("flex p-1", desktopCollapsed ? "justify-center" : "items-center justify-between")}>
           {!desktopCollapsed ? (
             <div className="flex items-center gap-2.5">
@@ -224,7 +273,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {renderNav(desktopCollapsed, false)}
       </div>
 
-      <div className="border-t border-slate-200 p-2.5">
+      <div className="p-2.5">
         <div className={cn(desktopCollapsed ? "flex items-center justify-center" : "")}>{accountMenu(desktopCollapsed ? "compact" : "expanded")}</div>
       </div>
     </>
@@ -233,7 +282,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen text-[var(--ink)]">
       <aside
-        className="fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 bg-[#f8f8f8] transition-[width] duration-200 md:flex md:flex-col"
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden border-r border-slate-200 bg-[#f8f8f8] md:flex md:flex-col",
+          sidebarStateReady ? "transition-[width] duration-200" : "",
+        )}
         style={{ width: desktopCollapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
       >
         {sidebar}
@@ -272,7 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         role="dialog"
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-slate-200 p-3">
+          <div className="p-3">
             <div className="flex items-center justify-between p-1">
               <div className="flex items-center gap-2.5">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-900 text-white">
@@ -299,11 +351,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {renderNav(false, true)}
           </div>
 
-          <div className="border-t border-slate-200 p-2.5">{accountMenu("mobile")}</div>
+          <div className="p-2.5">{accountMenu("mobile")}</div>
         </div>
       </aside>
 
-      <div className={cn("min-h-screen transition-[padding-left] duration-200", contentPaddingLeft)}>
+      <div className={cn("min-h-screen", sidebarStateReady ? "transition-[padding-left] duration-200" : "", contentPaddingLeft)}>
         <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-white/85 backdrop-blur">
           <div className="px-4 py-3 sm:px-6">
             <div className="flex items-center justify-between gap-3">
