@@ -71,7 +71,7 @@ export function OpsMetricCard({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-xl bg-slate-100/90 px-3 py-3", className)}>
+    <div className={cn("rounded-xl border border-slate-300 bg-white px-3 py-3 shadow-[0_6px_14px_rgba(15,23,42,0.04)]", className)}>
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
         {Icon ? <Icon className="h-4 w-4 text-slate-500" /> : null}
