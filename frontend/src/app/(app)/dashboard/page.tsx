@@ -102,6 +102,7 @@ export default function DashboardPage() {
   const [localOpening, setLocalOpening] = useState(false);
   const [localValidating, setLocalValidating] = useState(false);
   const [feedbackDialog, setFeedbackDialog] = useState<{ title: string; description: string } | null>(null);
+  const [folderPickerDialogOpen, setFolderPickerDialogOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -221,46 +222,10 @@ export default function DashboardPage() {
     }
   };
 
-  const chooseLocalRepositoryFolder = () => {
-    localFolderPickerRef.current?.click();
-  };
-
-  const handleLocalFolderSelection = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []) as PickerFile[];
-    event.target.value = "";
-    if (files.length === 0) {
-      return;
-    }
-
-    const firstRelativePath = getRelativePath(files[0]);
-    const rootFolder = normalizeProjectName(firstRelativePath.split("/").filter(Boolean)[0] || files[0].name || "repository");
+  const discoverFromSelectedFolderName = useCallback((rootFolder: string) => {
     const fallbackHint = `/host/home/.../${rootFolder} or /Users/.../${rootFolder}`;
     setLocalSourceCandidates([]);
     setSelectedLocalFolder(rootFolder);
-
-    const inferredAbsolutePath = inferAbsoluteFolderPath(files);
-    if (inferredAbsolutePath) {
-      setLocalSourcePath(inferredAbsolutePath);
-      setLocalValidating(true);
-      void validateLocalSource(inferredAbsolutePath)
-        .then(() => setError(null))
-        .catch((err) => {
-          if (err instanceof ApiError) {
-            setError(err.message);
-          } else {
-            setError("Selected folder is not a valid repository source.");
-          }
-        })
-        .finally(() => setLocalValidating(false));
-      return;
-    }
-
-    const hasDirectoryStructure = files.some((file) => getRelativePath(file).includes("/"));
-    if (!hasDirectoryStructure) {
-      setError("Could not determine folder path from selection. Paste the local repository path manually.");
-      return;
-    }
-
     setLocalValidating(true);
     void discoverRepositorySource(rootFolder)
       .then((result) => {
@@ -291,6 +256,50 @@ export default function DashboardPage() {
         }
       })
       .finally(() => setLocalValidating(false));
+  }, []);
+
+  const chooseLocalRepositoryFolder = () => {
+    setFolderPickerDialogOpen(true);
+  };
+
+  const confirmLocalRepositoryFolderSelection = () => {
+    setFolderPickerDialogOpen(false);
+    localFolderPickerRef.current?.click();
+  };
+
+  const handleLocalFolderSelection = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []) as PickerFile[];
+    event.target.value = "";
+    if (files.length === 0) {
+      return;
+    }
+
+    const firstRelativePath = getRelativePath(files[0]);
+    const rootFolder = normalizeProjectName(firstRelativePath.split("/").filter(Boolean)[0] || files[0].name || "repository");
+
+    const inferredAbsolutePath = inferAbsoluteFolderPath(files);
+    if (inferredAbsolutePath) {
+      setLocalSourcePath(inferredAbsolutePath);
+      setLocalValidating(true);
+      void validateLocalSource(inferredAbsolutePath)
+        .then(() => setError(null))
+        .catch((err) => {
+          if (err instanceof ApiError) {
+            setError(err.message);
+          } else {
+            setError("Selected folder is not a valid repository source.");
+          }
+        })
+        .finally(() => setLocalValidating(false));
+      return;
+    }
+
+    const hasDirectoryStructure = files.some((file) => getRelativePath(file).includes("/"));
+    if (!hasDirectoryStructure) {
+      setError("Could not determine folder path from selection. Paste the local repository path manually.");
+      return;
+    }
+    discoverFromSelectedFolderName(rootFolder);
   };
 
   if (loading) {
@@ -470,6 +479,26 @@ export default function DashboardPage() {
             </div>
           </DialogContent>
         ) : null}
+      </Dialog>
+
+      <Dialog open={folderPickerDialogOpen} onOpenChange={setFolderPickerDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select Local Folder</DialogTitle>
+            <DialogDescription>
+              Continue to open your system folder picker. If full path access is restricted by browser rules, we will auto-discover matching
+              repository paths and let you choose.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 px-5 pb-5 pt-2">
+            <Button onClick={() => setFolderPickerDialogOpen(false)} size="sm" type="button" variant="outline">
+              Cancel
+            </Button>
+            <Button onClick={confirmLocalRepositoryFolderSelection} size="sm" type="button">
+              Continue
+            </Button>
+          </div>
+        </DialogContent>
       </Dialog>
     </PageShell>
   );

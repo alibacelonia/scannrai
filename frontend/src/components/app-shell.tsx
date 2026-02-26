@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, ShieldAlert, X } from "lucide-react";
+import { FolderGit2, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Settings2, ShieldAlert, X } from "lucide-react";
+import { ScanSearch } from "lucide-react";
 
 import { clearTokens } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -11,7 +12,12 @@ import { cn } from "@/lib/utils";
 const SIDEBAR_WIDTH_EXPANDED = 224;
 const SIDEBAR_WIDTH_COLLAPSED = 48;
 
-const navItems = [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }];
+const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/projects", label: "Repositories", icon: FolderGit2 },
+  { href: "/scans", label: "Scans", icon: ScanSearch },
+  { href: "/policy", label: "Policy", icon: Settings2 },
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -44,8 +50,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const sidebarWidthClass = desktopCollapsed ? "md:pl-12" : "md:pl-56";
   const currentSectionLabel = useMemo(() => {
+    if (pathname.startsWith("/policy")) return "Policy";
     if (pathname.startsWith("/projects/")) return "Repository";
+    if (pathname.startsWith("/projects")) return "Repositories";
     if (pathname.startsWith("/scans/")) return "Scan";
+    if (pathname.startsWith("/scans")) return "Scans";
     return "Dashboard";
   }, [pathname]);
 
