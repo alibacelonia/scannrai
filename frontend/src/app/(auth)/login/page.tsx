@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 
+import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { saveTokens } from "@/lib/auth";
 import { ApiError, login } from "@/lib/api";
@@ -50,18 +50,17 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center p-4">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_0%,rgba(15,23,42,0.2),transparent_36%),radial-gradient(circle_at_100%_100%,rgba(148,163,184,0.35),transparent_42%)]" />
-      <Card className="relative w-full max-w-md">
-        <CardHeader className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ink-subtle)]">ScannrAI</p>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <ShieldCheck className="h-5 w-5 text-slate-700" />
-            Sign in
-          </CardTitle>
-          <CardDescription>Access repositories, run scans, and review findings.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <div className="relative w-full max-w-md">
+        <OpsCard
+          chipDotClassName="bg-emerald-500"
+          chipLabel="ScannrAI"
+          description="Access repositories, run scans, and review findings."
+          icon={ShieldCheck}
+          title="Sign in"
+          contentClassName=""
+        >
           <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-1">
+            <OpsPanel className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Username</label>
               <Input
                 autoComplete="username"
@@ -69,8 +68,8 @@ export default function LoginPage() {
                 placeholder="your-username"
                 value={username}
               />
-            </div>
-            <div className="space-y-1">
+            </OpsPanel>
+            <OpsPanel className="space-y-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Password</label>
               <Input
                 autoComplete="current-password"
@@ -79,7 +78,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
               />
-            </div>
+            </OpsPanel>
             {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
             <Button className="w-full" disabled={loading} type="submit">
               {loading ? "Signing in..." : "Sign in"}
@@ -92,8 +91,8 @@ export default function LoginPage() {
               Create one
             </Link>
           </p>
-        </CardContent>
-      </Card>
+        </OpsCard>
+      </div>
     </div>
   );
 }

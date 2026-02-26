@@ -6,9 +6,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, Link2, PlayCircle, ShieldAlert } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
+import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, createScan, getProject, listProjectScans } from "@/lib/api";
 import type { Project, Scan } from "@/types/api";
@@ -101,11 +101,11 @@ export default function ProjectPage() {
   if (!project) {
     return (
       <PageShell eyebrow="Repository" title="Project not found" description="The repository could not be loaded.">
-        <Card>
-          <CardContent className="pt-5">
+        <OpsPanel className="rounded-2xl border border-slate-300 bg-white">
+          <div className="pt-2">
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">Project not found.</p>
-          </CardContent>
-        </Card>
+          </div>
+        </OpsPanel>
       </PageShell>
     );
   }
@@ -120,16 +120,18 @@ export default function ProjectPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Repository Source</CardTitle>
-            <CardDescription>Current source used by worker-scoped scan jobs.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] px-3 py-2">
+        <OpsCard
+          chipDotClassName="bg-cyan-500"
+          chipLabel="Source Config"
+          description="Current source used by worker-scoped scan jobs."
+          icon={Link2}
+          title="Repository Source"
+          contentClassName="space-y-4"
+        >
+            <OpsPanel className="px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Configured source</p>
               <p className="mt-1 break-all text-xs text-[var(--ink)]">{project.repo_url || "No source configured"}</p>
-            </div>
+            </OpsPanel>
 
             <form className="grid gap-3 md:grid-cols-[1fr_auto]" onSubmit={runScan}>
               <p className="self-center text-xs text-[var(--ink-muted)]">Scan runs asynchronously through Celery + Redis queue.</p>
@@ -139,24 +141,25 @@ export default function ProjectPage() {
               </Button>
             </form>
 
-            <div className="rounded-xl border border-[var(--border)] bg-white px-3 py-2">
+            <OpsPanel className="px-3 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Accepted source types</p>
               <p className="mt-1 text-xs text-[var(--ink-muted)]">Local git repository folder, local `.zip`, or remote git URL.</p>
-            </div>
+            </OpsPanel>
             {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
-          </CardContent>
-        </Card>
+        </OpsCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent scans</CardTitle>
-            <CardDescription>Latest runs for this repository.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <OpsCard
+          chipDotClassName="bg-emerald-500"
+          chipLabel="Scan Timeline"
+          description="Latest runs for this repository."
+          icon={Clock3}
+          title="Recent scans"
+          contentClassName="space-y-2"
+        >
             {scans.length === 0 ? <p className="text-xs text-[var(--ink-muted)]">No scans yet.</p> : null}
             {scans.map((scan) => (
               <Link
-                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:bg-[var(--bg-muted)]"
+                className="block rounded-xl bg-slate-100/90 p-3 transition"
                 href={`/scans/${scan.id}`}
                 key={scan.id}
               >
@@ -175,8 +178,7 @@ export default function ProjectPage() {
                 ) : null}
               </Link>
             ))}
-          </CardContent>
-        </Card>
+        </OpsCard>
       </section>
     </PageShell>
   );
@@ -191,23 +193,13 @@ function Metric({
   value: number;
   icon: React.ComponentType<{ className?: string }>;
 }) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">{label}</p>
-          <Icon className="h-4 w-4 text-[var(--ink-subtle)]" />
-        </div>
-        <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{value}</p>
-      </CardContent>
-    </Card>
-  );
+  return <OpsMetricCard icon={Icon} label={label} value={value} />;
 }
 
 function ProjectSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <div className="rounded-2xl border border-slate-300 bg-white p-4">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="mt-3 h-7 w-52" />
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
@@ -219,13 +211,13 @@ function ProjectSkeleton() {
         <Skeleton className="h-24 w-full" />
       </div>
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+        <div className="space-y-3 rounded-2xl border border-slate-300 bg-white p-4">
           <Skeleton className="h-3 w-28" />
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-9 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
-        <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+        <div className="space-y-2 rounded-2xl border border-slate-300 bg-white p-4">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />

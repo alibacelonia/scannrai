@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Download, FileCode2, Sparkles } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
+import { OpsCard, OpsPanel } from "@/components/ui/ops-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -270,12 +270,14 @@ export default function ScanPage() {
       }
     >
       <section className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Run progress</CardTitle>
-            <CardDescription>Auto-refreshes while the scan is queued or running.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <OpsCard
+          chipDotClassName="bg-cyan-500"
+          chipLabel="Execution"
+          description="Auto-refreshes while the scan is queued or running."
+          icon={Download}
+          title="Run progress"
+          contentClassName="space-y-4"
+        >
             <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--bg-muted)]">
               <div className="h-full rounded-full bg-[var(--primary)] transition-all" style={{ width: `${progress}%` }} />
             </div>
@@ -286,17 +288,18 @@ export default function ScanPage() {
               <Metric label="Low" value={summary.low} tone="low" />
               <Metric label="Info" value={summary.info} tone="info" />
             </div>
-          </CardContent>
-        </Card>
+        </OpsCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Findings</CardTitle>
-            <CardDescription>Click a row to inspect evidence and generate AI remediation.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <OpsCard
+          chipDotClassName="bg-violet-500"
+          chipLabel="Findings"
+          description="Click a row to inspect evidence and generate AI remediation."
+          icon={FileCode2}
+          title="Findings"
+          contentClassName="space-y-4"
+        >
             <div className="grid gap-3 md:grid-cols-4">
-              <div className="space-y-1">
+              <OpsPanel className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity</p>
                 <Select onValueChange={(value) => setSeverity(value === "all" ? "" : (value as Severity))} value={severity || "all"}>
                   <SelectTrigger>
@@ -310,9 +313,9 @@ export default function ScanPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </OpsPanel>
 
-              <div className="space-y-1">
+              <OpsPanel className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Tool</p>
                 <Select onValueChange={(value) => setTool(value === "all" ? "" : (value as Tool))} value={tool || "all"}>
                   <SelectTrigger>
@@ -326,65 +329,66 @@ export default function ScanPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </OpsPanel>
 
-              <div className="space-y-1">
+              <OpsPanel className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Category</p>
                 <Input onChange={(event) => setCategory(event.target.value)} placeholder="Filter category" value={category} />
-              </div>
+              </OpsPanel>
 
-              <div className="space-y-1">
+              <OpsPanel className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">File path</p>
                 <Input onChange={(event) => setFileQuery(event.target.value)} placeholder="Filter file" value={fileQuery} />
-              </div>
+              </OpsPanel>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Tool</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead>Lines</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {findings.length === 0 ? (
-                  scan.status === "running" || scan.status === "queued" ? (
-                    <FindingSkeletonRows />
+            <OpsPanel className="px-0 py-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Severity</TableHead>
+                    <TableHead>Tool</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>File</TableHead>
+                    <TableHead>Lines</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {findings.length === 0 ? (
+                    scan.status === "running" || scan.status === "queued" ? (
+                      <FindingSkeletonRows />
+                    ) : (
+                      <TableRow>
+                        <TableCell className="text-[var(--ink-muted)]" colSpan={5}>
+                          No findings for this filter.
+                        </TableCell>
+                      </TableRow>
+                    )
                   ) : (
-                    <TableRow>
-                      <TableCell className="text-[var(--ink-muted)]" colSpan={5}>
-                        No findings for this filter.
-                      </TableCell>
-                    </TableRow>
-                  )
-                ) : (
-                  findings.map((finding) => (
-                    <TableRow
-                      className="cursor-pointer"
-                      key={finding.id}
-                      onClick={() => {
-                        void openFinding(finding.id);
-                      }}
-                    >
-                      <TableCell>
-                        <Badge variant={finding.severity}>{finding.severity}</Badge>
-                      </TableCell>
-                      <TableCell>{finding.tool}</TableCell>
-                      <TableCell>{finding.category}</TableCell>
-                      <TableCell className="max-w-[360px] truncate">{finding.file_path || "-"}</TableCell>
-                      <TableCell>
-                        {finding.line_start ? `${finding.line_start}${finding.line_end ? `-${finding.line_end}` : ""}` : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                    findings.map((finding) => (
+                      <TableRow
+                        className="cursor-pointer"
+                        key={finding.id}
+                        onClick={() => {
+                          void openFinding(finding.id);
+                        }}
+                      >
+                        <TableCell>
+                          <Badge variant={finding.severity}>{finding.severity}</Badge>
+                        </TableCell>
+                        <TableCell>{finding.tool}</TableCell>
+                        <TableCell>{finding.category}</TableCell>
+                        <TableCell className="max-w-[360px] truncate">{finding.file_path || "-"}</TableCell>
+                        <TableCell>
+                          {finding.line_start ? `${finding.line_start}${finding.line_end ? `-${finding.line_end}` : ""}` : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </OpsPanel>
+        </OpsCard>
       </section>
 
       <Dialog
@@ -541,13 +545,13 @@ function Metric({
   tone: "critical" | "high" | "medium" | "low" | "info";
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] p-3">
+    <OpsPanel className="p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">{label}</p>
         <Badge variant={tone}>{tone}</Badge>
       </div>
       <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{value}</p>
-    </div>
+    </OpsPanel>
   );
 }
 
@@ -570,18 +574,18 @@ function patchLineClassName(line: string) {
 function ScanSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <div className="rounded-2xl border border-slate-300 bg-white p-4">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="mt-3 h-7 w-40" />
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
       </div>
       <div className="space-y-4">
-        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+        <div className="space-y-3 rounded-2xl border border-slate-300 bg-white p-4">
           <Skeleton className="h-3 w-28" />
           <Skeleton className="h-2 w-full rounded-full" />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {Array.from({ length: 5 }).map((_, idx) => (
-              <div className="space-y-2 rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] p-3" key={`metric-${idx}`}>
+              <div className="space-y-2 rounded-xl bg-slate-100/90 p-3" key={`metric-${idx}`}>
                 <Skeleton className="h-3 w-16" />
                 <Skeleton className="h-6 w-10" />
               </div>
@@ -589,7 +593,7 @@ function ScanSkeleton() {
           </div>
         </div>
 
-        <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+        <div className="space-y-3 rounded-2xl border border-slate-300 bg-white p-4">
           <Skeleton className="h-3 w-20" />
           <div className="grid gap-3 md:grid-cols-4">
             <Skeleton className="h-9 w-full" />

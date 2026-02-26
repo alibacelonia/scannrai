@@ -4,8 +4,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { CircleHelp, ShieldCheck, TimerReset } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
+import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -96,12 +96,14 @@ export default function PolicyPage() {
           <PolicyInfo title="Tools enabled" value={`${Object.values(policy.tools_enabled).filter(Boolean).length}/3`} icon={ShieldCheck} />
         </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Tooling</CardTitle>
-            <CardDescription>Enable or disable scanning adapters per tenant policy.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <OpsCard
+          chipDotClassName="bg-emerald-500"
+          chipLabel="Tool Controls"
+          description="Enable or disable scanning adapters per tenant policy."
+          icon={ShieldCheck}
+          title="Tooling"
+          contentClassName=""
+        >
             <div className="grid gap-2 sm:grid-cols-3">
               <PolicyToggle
                 checked={policy.tools_enabled.semgrep}
@@ -149,16 +151,17 @@ export default function PolicyPage() {
                 }
               />
             </div>
-          </CardContent>
-        </Card>
+        </OpsCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Thresholds and timeouts</CardTitle>
-            <CardDescription>Tune scanner execution windows and result retention.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-1">
+        <OpsCard
+          chipDotClassName="bg-sky-500"
+          chipLabel="Execution Limits"
+          description="Tune scanner execution windows and result retention."
+          icon={TimerReset}
+          title="Thresholds and timeouts"
+          contentClassName="grid gap-3 md:grid-cols-2"
+        >
+            <OpsPanel className="space-y-1">
               <div className="flex items-center gap-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Severity threshold</p>
                 <InfoPopover
@@ -181,9 +184,9 @@ export default function PolicyPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </OpsPanel>
 
-            <div className="space-y-1">
+            <OpsPanel className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Retention days</p>
               <Input
                 min={1}
@@ -193,9 +196,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.retention_days}
               />
-            </div>
+            </OpsPanel>
 
-            <div className="space-y-1">
+            <OpsPanel className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Semgrep timeout (s)</p>
               <Input
                 min={30}
@@ -207,9 +210,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.semgrep_timeout_seconds}
               />
-            </div>
+            </OpsPanel>
 
-            <div className="space-y-1">
+            <OpsPanel className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">OSV timeout (s)</p>
               <Input
                 min={30}
@@ -221,9 +224,9 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.osv_timeout_seconds}
               />
-            </div>
+            </OpsPanel>
 
-            <div className="space-y-1 md:col-span-2">
+            <OpsPanel className="space-y-1 md:col-span-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">Gitleaks timeout (s)</p>
               <Input
                 min={30}
@@ -235,9 +238,8 @@ export default function PolicyPage() {
                 type="number"
                 value={policy.gitleaks_timeout_seconds}
               />
-            </div>
-          </CardContent>
-        </Card>
+            </OpsPanel>
+        </OpsCard>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button disabled={saving} type="submit">
@@ -265,13 +267,13 @@ function PolicyToggle({
   const fieldId = `policy-tool-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-muted)] px-3 py-2 text-xs">
+    <OpsPanel className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
       <label className="flex items-center gap-2" htmlFor={fieldId}>
         <input checked={checked} id={fieldId} onChange={(event) => onCheckedChange(event.target.checked)} type="checkbox" />
         {label}
       </label>
       <InfoPopover description={description} title={label} />
-    </div>
+    </OpsPanel>
   );
 }
 
@@ -304,23 +306,13 @@ function PolicyInfo({
   value: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">{title}</p>
-          <Icon className="h-4 w-4 text-[var(--ink-subtle)]" />
-        </div>
-        <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{value}</p>
-      </CardContent>
-    </Card>
-  );
+  return <OpsMetricCard icon={Icon} label={title} value={value} />;
 }
 
 function PolicySkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <div className="rounded-2xl border border-slate-300 bg-white p-4">
         <Skeleton className="h-3 w-20" />
         <Skeleton className="mt-3 h-7 w-36" />
         <Skeleton className="mt-2 h-4 w-60 max-w-full" />
@@ -330,7 +322,7 @@ function PolicySkeleton() {
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
-      <div className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <div className="space-y-3 rounded-2xl border border-slate-300 bg-white p-4">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-10 w-full" />

@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { FolderGit2, TimerReset, Waves } from "lucide-react";
 
 import { PageShell } from "@/components/page-shell";
+import { OpsCard, OpsMetricCard, OpsPanel } from "@/components/ui/ops-card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, listProjects, listProjectScans } from "@/lib/api";
 import type { Project } from "@/types/api";
@@ -82,18 +82,20 @@ export default function ProjectsPage() {
         <SummaryCard icon={Waves} label="Failed scans" value={totals.failed} />
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Repositories</CardTitle>
-          <CardDescription>Open repository details and scan history.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+      <OpsCard
+        chipDotClassName="bg-violet-500"
+        chipLabel="Repository Index"
+        description="Open repository details and scan history."
+        icon={FolderGit2}
+        title="Repositories"
+        contentClassName="space-y-2"
+      >
           {projects.length === 0 ? <p className="text-xs text-[var(--ink-muted)]">No repositories configured yet.</p> : null}
           {projects.map((project) => {
             const summary = scanSummary[project.id] ?? { total: 0, running: 0, queued: 0, failed: 0 };
             return (
               <Link
-                className="block rounded-xl border border-[var(--border)] bg-[var(--bg-muted)]/65 p-3 transition hover:bg-[var(--bg-muted)]"
+                className="block rounded-xl bg-slate-100/90 p-3 transition"
                 href={`/projects/${project.id}`}
                 key={project.id}
               >
@@ -113,8 +115,7 @@ export default function ProjectsPage() {
             );
           })}
           {error ? <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
-        </CardContent>
-      </Card>
+      </OpsCard>
     </PageShell>
   );
 }
@@ -129,22 +130,14 @@ function SummaryCard({
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.11em] text-[var(--ink-subtle)]">{label}</p>
-          <Icon className="h-4 w-4 text-[var(--ink-subtle)]" />
-        </div>
-        <p className="mt-2 text-lg font-semibold text-[var(--ink)]">{value}</p>
-      </CardContent>
-    </Card>
+    <OpsMetricCard icon={Icon} label={label} value={value} />
   );
 }
 
 function ProjectsSkeleton() {
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <div className="rounded-2xl border border-slate-300 bg-white p-4">
         <Skeleton className="h-3 w-32" />
         <Skeleton className="mt-3 h-7 w-48" />
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
@@ -154,12 +147,12 @@ function ProjectsSkeleton() {
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
       </div>
-      <div className="space-y-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+      <OpsPanel className="space-y-2 rounded-2xl">
         <Skeleton className="h-3 w-28" />
         {Array.from({ length: 3 }).map((_, idx) => (
           <Skeleton className="h-16 w-full" key={`project-row-${idx}`} />
         ))}
-      </div>
+      </OpsPanel>
     </div>
   );
 }
